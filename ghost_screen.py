@@ -1018,20 +1018,23 @@ class GtkGhostScreen(GhostScreen):
             if not gdk_win:
                 return
             display = gdk_win.get_display()
-            seat = display.get_default_seat()
-            status = seat.grab(
-                gdk_win, Gdk.SeatCapabilities.ALL,
-                True, None, None, None,
-            )
-            self._grab_active = (status == Gdk.GrabStatus.SUCCESS)
-            if self._grab_active:
-                self._window.connect("key-press-event", self._on_consume)
-                self._window.connect("key-release-event", self._on_consume)
-                self._window.connect("button-press-event", self._on_consume)
-                self._window.connect("button-release-event", self._on_consume)
-                self._window.connect("scroll-event", self._on_consume)
-                self._window.connect("motion-notify-event", self._on_consume)
-                self._window.connect("touch-event", self._on_consume)
+            seats = display.list_seats()
+            all_ok = True
+            for seat in seats:
+                status = seat.grab(
+                    gdk_win, Gdk.SeatCapabilities.ALL,
+                    True, None, None, None,
+                )
+                if status != Gdk.GrabStatus.SUCCESS:
+                    all_ok = False
+            self._grab_active = all_ok
+            self._window.connect("key-press-event", self._on_consume)
+            self._window.connect("key-release-event", self._on_consume)
+            self._window.connect("button-press-event", self._on_consume)
+            self._window.connect("button-release-event", self._on_consume)
+            self._window.connect("scroll-event", self._on_consume)
+            self._window.connect("motion-notify-event", self._on_consume)
+            self._window.connect("touch-event", self._on_consume)
         except Exception:
             self._grab_active = False
 

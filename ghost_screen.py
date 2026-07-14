@@ -347,6 +347,11 @@ def main():
         kill_ghost()
         print("Ghost screen dismissed.")
     else:
+        if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            print(
+                "WARNING: You are on Wayland. Transparent overlays won't work.\n"
+                "         Log out, select 'Ubuntu on Xorg' at login, then try again.\n"
+            )
         cfg = {}
         if os.path.exists(CONFIG_FILE):
             try:

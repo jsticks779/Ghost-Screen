@@ -40,20 +40,44 @@ Categories=Utility;
 EOF
 chmod +x "$APP/ghost-screen.desktop"
 
+# ── Wayland check ────────────────────────────────────────────────────
+if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+    echo ""
+    echo "  WARNING: You are on Wayland. Transparent overlays don't work here."
+    echo "  To fix: Log out → click gear icon → select 'Ubuntu on Xorg' → log in"
+    echo "  Then Ctrl+3 will work."
+fi
+
 # ── Auto-setup Ctrl+3 shortcut (GNOME) ───────────────────────────────
 SHORTCUT_OK=""
 
 if command -v gsettings &>/dev/null; then
     RESULT=$(python3 -c "
-import subprocess as sp
+import subprocess as sp, ast
 schema = 'org.gnome.settings-daemon.plugins.media-keys'
+target_cmd = '$CMD'
+
+# Check if already registered
+cur = sp.run(['gsettings', 'get', schema, 'custom-keybindings'], capture_output=True, text=True).stdout.strip()
+if cur.startswith('['):
+    try:
+        existing = ast.literal_eval(cur)
+        for p in existing:
+            cmd = sp.run(['gsettings', 'get', f'{schema}.custom-keybinding:{p}', 'command'], capture_output=True, text=True).stdout.strip().strip(\"'\")
+            if cmd == target_cmd:
+                print('ALREADY_EXISTS')
+                exit(0)
+    except:
+        pass
+
+# Find free slot
 for i in range(100):
     path = f'/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom{i}/'
     r = sp.run(['gsettings', 'get', f'{schema}.custom-keybinding:{path}', 'name'], capture_output=True, text=True)
     n = r.stdout.strip()
     if n in (\"''\", '@as []', '') or r.returncode != 0:
         sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'name', 'Ghost Screen'])
-        sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'command', '$CMD'])
+        sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'command', target_cmd])
         sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'binding', '<Primary>3'])
         cur = sp.run(['gsettings', 'get', schema, 'custom-keybindings'], capture_output=True, text=True).stdout.strip()
         if cur in ('@as []', '[]'):
@@ -66,6 +90,9 @@ print('NO_SLOT')
 " 2>&1)
     if [ "$RESULT" = "OK" ]; then
         SHORTCUT_OK=1
+    elif [ "$RESULT" = "ALREADY_EXISTS" ]; then
+        SHORTCUT_OK=1
+        echo "    Ctrl+3 shortcut already registered (skipped duplicate)."
     fi
 fi
 

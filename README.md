@@ -1,23 +1,28 @@
 # Ghost Screen
 
-An animated tech ghost overlay for your Linux desktop. Toggle it on/off with a
-keyboard shortcut for a cyberpunk holographic screensaver effect.
+An animated tech ghost overlay for **any Linux desktop**. Toggle it on/off with
+Ctrl+3 for a cyberpunk holographic screensaver effect.
 
 ## Features
 
 - Full-screen animated tech ghost with rotating geometric core
 - Circuit trace patterns, floating particles, scan lines, HUD brackets
-- Toggle on/off — single command or keyboard shortcut
-- Click anywhere or press Escape to dismiss
+- Toggle on/off — same shortcut or command
+- **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River)
+- **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
+- Auto-darkens on X11 with tkinter (also works on XWayland as a fallback)
 - Customizable colors, opacity, speed, and particle count
 - Dark semi-transparent overlay over your desktop
 
 ## Requirements
 
-- **Linux** with X11 or Wayland (auto-detected, both supported)
-- **Python 3** — tkinter (X11) or GTK3 (Wayland) auto-installed
+- **Linux** with **X11** or **Wayland** (auto-detected)
+- **Python 3** — deps installed automatically by `install.sh`
 
-> **Wayland note**: transparency works out of the box — uses GTK3 backend automatically.
+| Display | Backend          | Required Packages                       |
+|---------|------------------|-----------------------------------------|
+| X11     | tkinter          | `python3-tk`                            |
+| Wayland | GTK3 + Pillow    | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
 
 ## Installation (one command — fully automatic)
 
@@ -28,14 +33,22 @@ cd Ghost-Screen
 ```
 
 What `install.sh` does automatically:
-- Installs the right graphics backend (**tkinter** for X11, **GTK3** for Wayland)
+- Installs the right graphics backend for your display server
 - Copies `ghost_screen.py` to `~/.local/bin/ghost-screen`
 - Creates a desktop entry (shows in app menu)
 - **Detects your desktop environment and registers Ctrl+3:**
-  - **GNOME** (Ubuntu, Budgie, Cinnamon, MATE) → uses `gsettings`
-  - **XFCE** → uses `xfconf-query`
-  - **KDE Plasma** → uses `kwriteconfig5`
-  - **Any other** → installs `xbindkeys` as universal fallback
+
+  | Desktop              | Method                        |
+  |----------------------|-------------------------------|
+  | **GNOME** (Ubuntu)   | `gsettings`                   |
+  | **KDE Plasma**       | `kwriteconfig5` + `qdbus`     |
+  | **XFCE**             | `xfconf-query`                |
+  | **Sway**             | Appends to `~/.config/sway/config` |
+  | **Hyprland**         | Appends to `~/.config/hypr/hyprland.conf` |
+  | **River**            | Appends to `~/.config/river/init` |
+  | **Other Wayland**    | Best-effort; manual setup if needed |
+  | **Other X11**        | `xbindkeys` universal fallback |
+
 - Adds `~/.local/bin` to your `PATH` in `~/.bashrc`
 
 After running it, **Ctrl+3** works immediately — no Settings menu needed.
@@ -54,20 +67,20 @@ Then set a keyboard shortcut in your DE's settings (see below).
 
 ### Ctrl+3 is set automatically — any desktop
 
-The install script detects your environment (GNOME, XFCE, KDE, or others via
-xbindkeys) and registers **Ctrl+3** without you lifting a finger.
-
-It persists across reboots.
+The install script detects your environment and registers **Ctrl+3** without
+you lifting a finger. It persists across reboots.
 
 ### Manual setup (if needed)
 
-| DE | Steps |
-|----|-------|
-| **GNOME** | Settings → Keyboard → Shortcuts → + → Name: `Ghost Screen` → Command: `~/.local/bin/ghost-screen` → Set Shortcut: Ctrl+3 |
-| **KDE** | System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL → set to `~/.local/bin/ghost-screen` |
-| **XFCE** | Settings → Keyboard → Application Shortcuts → Add → `~/.local/bin/ghost-screen` |
-| **i3/Sway** | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
-| **Any** | Use your DE's custom shortcut feature with command `~/.local/bin/ghost-screen` |
+| DE/WM                | Steps |
+|----------------------|-------|
+| **GNOME**            | Settings → Keyboard → Shortcuts → + → Name: `Ghost Screen` → Command: `~/.local/bin/ghost-screen` → Set Shortcut: Ctrl+3 |
+| **KDE**              | System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL → set to `~/.local/bin/ghost-screen` |
+| **XFCE**             | Settings → Keyboard → Application Shortcuts → Add → `~/.local/bin/ghost-screen` |
+| **Sway**             | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
+| **Hyprland**         | Add `bind = Ctrl, 3, exec, ~/.local/bin/ghost-screen` to config |
+| **River**            | Add `riverctl map normal Ctrl 3 spawn ~/.local/bin/ghost-screen &` to config |
+| **Any**              | Use your DE/WM's custom shortcut feature with command `~/.local/bin/ghost-screen` |
 
 ## Usage
 
@@ -75,6 +88,7 @@ It persists across reboots.
 ghost-screen            # toggle on/off
 ghost-screen --kill     # force stop
 ghost-screen --version  # show version
+ghost-screen --check    # verify dependencies
 ```
 
 The **only** way to dismiss the ghost is pressing your shortcut again (toggle off).
@@ -103,14 +117,14 @@ Create a `ghost_screen.json` file next to the script:
 }
 ```
 
-| Option         | Description                    | Default |
-|----------------|--------------------------------|---------|
-| `opacity`      | Window opacity (0–1)          | 0.88    |
-| `frame_delay`  | ms per frame (lower = faster) | 33      |
-| `particle_count`| Number of particles           | 60      |
-| `ghost_scale`  | Ghost size (fraction of screen)| 0.28   |
-| `float_amplitude`| Float motion (pixels)        | 30      |
-| `rotation_speed`| Core rotation speed           | 0.02    |
+| Option           | Description                           | Default |
+|------------------|---------------------------------------|---------|
+| `opacity`        | Window opacity (0–1)                 | 0.88    |
+| `frame_delay`    | ms per frame (lower = faster)        | 33      |
+| `particle_count` | Number of particles                  | 60      |
+| `ghost_scale`    | Ghost size (fraction of screen)      | 0.28    |
+| `float_amplitude`| Float motion (pixels)                | 30      |
+| `rotation_speed` | Core rotation speed                  | 0.02    |
 
 ## Uninstall
 
@@ -119,7 +133,8 @@ cd Ghost-Screen
 ./uninstall.sh
 ```
 
-This removes the binary, desktop entry, and **also cleans up the Ctrl+3 shortcut**.
+This removes the binary, desktop entry, **and cleans up the Ctrl+3 shortcut**
+from all desktop environments and wlroots configs.
 
 Or do it manually:
 
@@ -129,15 +144,23 @@ rm -f ~/.local/bin/ghost-screen
 rm -f ~/.local/share/applications/ghost-screen.desktop
 ```
 
-Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if `uninstall.sh` didn't catch it.
+Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if
+`uninstall.sh` didn't catch it.
 
 ## How It Works
 
-`ghost_screen.py` creates a full-screen, transparent tkinter window over your
-desktop. A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is
-already displayed — running the script again kills the existing instance
-(toggle behavior). The ghost floats, rotates, pulses, and drifts particles at
-~30 FPS. Only the shortcut toggles it off — no click or Escape.
+`ghost_screen.py` auto-detects your display server and picks the right backend:
+
+- **Wayland** → GTK3 window with RGBA visual, renders each frame with Pillow,
+  converts to `GdkPixbuf`, displays on a `Gtk.Image` — fully transparent
+  background with no Cairo GI dependency
+- **X11** → tkinter window with `-alpha` for transparency, draws with the
+  tkinter canvas API
+
+A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is already
+displayed — running the script again kills the existing instance (toggle
+behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.
+Only the shortcut toggles it off — no click or Escape.
 
 ## License
 

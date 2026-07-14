@@ -54,6 +54,22 @@ fi
 # XFCE cleanup (best-effort)
 command -v xfconf-query &>/dev/null && xfconf-query -c xfce4-keyboard-shortcuts -r -p "/commands/custom/<Primary>3" 2>/dev/null || true
 
+# KDE cleanup (best-effort)
+if command -v kwriteconfig5 &>/dev/null; then
+    kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group "Ghost Screen" --key "Ghost Screen" "" 2>/dev/null || true
+fi
+
+# wlroots config cleanup (best-effort — just remove our comment block)
+for cfg in "$HOME/.config/sway/config" "$HOME/.config/hypr/hyprland.conf" "$HOME/.config/river/init"; do
+    [ -f "$cfg" ] || continue
+    if grep -q "Ghost Screen installer" "$cfg" 2>/dev/null; then
+        sed -i '/^# Added by Ghost Screen/,/^[^#]/d' "$cfg" 2>/dev/null
+        # Remove trailing blank lines left behind
+        sed -i '/^$/N;/^\n$/D' "$cfg" 2>/dev/null || true
+        echo "    Cleaned $cfg"
+    fi
+done
+
 echo ""
 echo "  Ghost Screen uninstalled!"
 echo ""

@@ -462,6 +462,12 @@ class GtkGhostScreen(GhostScreen):
 
         return True
 
+    def run(self):
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk
+        Gtk.main()
+
     # ── Drawing helpers ───────────────────────────────────────────
 
     def _draw_vignette(self, draw, t, c):
@@ -598,11 +604,6 @@ class GtkGhostScreen(GhostScreen):
         scan_y = (t * 60) % self.sh
         draw.line([(0, scan_y), (self.sw, scan_y)], fill=col, width=1)
 
-    def run(self):
-        from gi.repository import Gtk
-        Gtk.main()
-
-
 # ─── Factory ───────────────────────────────────────────────────────────
 
 def create_ghost_screen(cfg=None):
@@ -618,15 +619,57 @@ def create_ghost_screen(cfg=None):
     return TkinterGhostScreen(cfg)
 
 
+def check_deps():
+    ok = True
+    display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
+
+    try:
+        import tkinter as tk
+        r = tk.Tk()
+        r.destroy()
+        print(f"  [X11]  tkinter: OK")
+    except Exception as e:
+        print(f"  [X11]  tkinter: MISSING ({e})")
+        ok = False
+
+    if display_type == "wayland":
+        try:
+            import gi
+            gi.require_version("Gtk", "3.0")
+            gi.require_version("Gdk", "3.0")
+            from gi.repository import Gtk, Gdk
+            print(f"  [WL]   GTK3 GI:  OK")
+        except Exception as e:
+            print(f"  [WL]   GTK3 GI:  MISSING ({e})")
+            ok = False
+
+        try:
+            from PIL import Image
+            print(f"  [WL]   Pillow:   OK  (PIL {Image.__version__})")
+        except ImportError:
+            print(f"  [WL]   Pillow:   MISSING (install python3-pil)")
+            ok = False
+
+    if ok:
+        print(f"\n  All dependencies satisfied.")
+    else:
+        print(f"\n  Some dependencies missing — see above.")
+    sys.exit(0 if ok else 1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=f"{PROJECT} v{VERSION}")
     parser.add_argument("--kill", "-k", action="store_true", help="Kill running instance")
     parser.add_argument("--version", "-v", action="store_true", help="Show version")
+    parser.add_argument("--check", "-c", action="store_true", help="Check dependencies")
     args = parser.parse_args()
 
     if args.version:
         print(f"{PROJECT} v{VERSION}")
         sys.exit(0)
+
+    if args.check:
+        check_deps()
 
     if args.kill:
         kill_ghost()
@@ -636,8 +679,14 @@ def main():
         kill_ghost()
         print("Ghost screen dismissed.")
     else:
-        app = create_ghost_screen()
-        app.run()
+        try:
+            app = create_ghost_screen()
+            app.run()
+        except KeyboardInterrupt:
+            print()
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

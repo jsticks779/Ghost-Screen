@@ -167,6 +167,43 @@ else
 
 fi
 
+# ── Build dependencies (for wl_inhibit.so + ghost-touch-inhibit) ──────
+
+if [ "$display_type" = "wayland" ]; then
+    case "$PM" in
+        apt)
+            if ! command -v gcc &>/dev/null; then
+                echo "    Installing gcc..."
+                pm_install "build-essential" 2>/dev/null || true
+            fi
+            if ! command -v wayland-scanner &>/dev/null; then
+                echo "    Installing wayland-scanner..."
+                pm_install "libwayland-dev" 2>/dev/null || true
+            fi
+            if ! command -v pkg-config &>/dev/null; then
+                echo "    Installing pkg-config..."
+                pm_install "pkg-config" 2>/dev/null || true
+            fi
+            if [ ! -f /usr/share/wayland-protocols/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml ]; then
+                echo "    Installing wayland-protocols..."
+                pm_install "wayland-protocols" 2>/dev/null || true
+            fi
+            ;;
+        pacman)
+            command -v gcc &>/dev/null || pm_install "base-devel" 2>/dev/null || true
+            command -v wayland-scanner &>/dev/null || pm_install "wayland" 2>/dev/null || true
+            ;;
+        dnf)
+            command -v gcc &>/dev/null || pm_install "gcc" 2>/dev/null || true
+            command -v wayland-scanner &>/dev/null || pm_install "wayland-devel" 2>/dev/null || true
+            ;;
+        zypper)
+            command -v gcc &>/dev/null || pm_install "gcc" 2>/dev/null || true
+            command -v wayland-scanner &>/dev/null || pm_install "libwayland-devel" 2>/dev/null || true
+            ;;
+    esac
+fi
+
 echo "    Display server: $display_type"
 
 # ── Install files ─────────────────────────────────────────────────────
@@ -211,7 +248,10 @@ if command -v gcc &>/dev/null && [ -f "$DIR/ghost_touch_inhibit.c" ]; then
     gcc -O2 -o "$DIR/ghost-touch-inhibit" "$DIR/ghost_touch_inhibit.c" -Wall 2>/dev/null && \
     echo "    ghost-touch-inhibit built OK"
     if [ -f "$DIR/ghost-touch-inhibit" ]; then
-        cp "$DIR/ghost-touch-inhibit" "$BIN/ghost-touch-inhibit"
+        # Remove old root-owned file first, then copy new one
+        [ -f "$BIN/ghost-touch-inhibit" ] && sudo rm -f "$BIN/ghost-touch-inhibit" 2>/dev/null || true
+        cp "$DIR/ghost-touch-inhibit" "$BIN/ghost-touch-inhibit" 2>/dev/null && \
+        chmod +x "$BIN/ghost-touch-inhibit"
         # Set SUID root so non-root user can inhibit touchscreen devices
         if [ "$(id -u)" -eq 0 ]; then
             chown root:root "$BIN/ghost-touch-inhibit"
@@ -221,7 +261,7 @@ if command -v gcc &>/dev/null && [ -f "$DIR/ghost_touch_inhibit.c" ]; then
             sudo chown root:root "$BIN/ghost-touch-inhibit" 2>/dev/null && \
             sudo chmod u+s "$BIN/ghost-touch-inhibit" 2>/dev/null && \
             echo "    ghost-touch-inhibit SUID set" || \
-            echo "    ghost-touch-inhibit SUID not set (run with sudo for touchscreen blocking)"
+            echo "    ghost-touch-inhibit SUID not set (run install.sh with sudo for touchscreen blocking)"
         fi
     fi
 fi

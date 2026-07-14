@@ -359,10 +359,7 @@ class GtkGhostScreen(GhostScreen):
         import gi
         gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        gi.require_version("cairo", "1.0")
-        from gi.repository import Gtk, Gdk, GLib, cairo
-        self._OP_SOURCE = cairo.Operator.SOURCE
-        self._OP_OVER = cairo.Operator.OVER
+        from gi.repository import Gtk, Gdk, GLib
 
         display = Gdk.Display.get_default()
         if display:
@@ -423,11 +420,7 @@ class GtkGhostScreen(GhostScreen):
         scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
         op = self.cfg["opacity"]
 
-        # Clear background to transparent (SOURCE operator replaces, not blends)
-        cr.set_operator(self._OP_SOURCE)
-        cr.set_source_rgba(0, 0, 0, 0)
-        cr.paint()
-        cr.set_operator(self._OP_OVER)
+        # Window starts transparent with RGBA visual — just draw over it
 
         self._draw_vignette(cr, op)
         self._draw_grid(cr, t, cx, cy, c["grid"])

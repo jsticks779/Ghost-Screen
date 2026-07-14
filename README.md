@@ -15,6 +15,7 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 - Auto-darkens on X11 with tkinter (also works on XWayland as a fallback)
 - Customizable colors, opacity, speed, and particle count
 - Dark semi-transparent overlay over your desktop
+- **Full input blocking** while ghost is active — keyboard, mouse, touchpad, touchscreen — on **every Linux compositor**
 
 ## Requirements
 
@@ -34,6 +35,10 @@ git clone https://github.com/jsticks779/Ghost-Screen.git
 cd Ghost-Screen
 ./install.sh
 ```
+
+**You'll be prompted for `sudo`** — the script needs it to install system
+packages and set up the SUID helper for input blocking. Full install takes
+~20 seconds.
 
 The install script auto-detects **everything**:
 
@@ -63,15 +68,9 @@ The install script auto-detects **everything**:
 
 After running it, **Ctrl+3** works immediately — no Settings menu needed.
 
-### Manual installation (if you prefer)
-
-```bash
-mkdir -p ~/.local/bin ~/.local/share/applications
-cp ghost_screen.py ~/.local/bin/ghost-screen
-chmod +x ~/.local/bin/ghost-screen
-```
-
-Then set a keyboard shortcut in your DE's settings (see below).
+> **Note:** Manual install is **not recommended** — the C helpers (`wl_inhibit.so`,
+> `ghost-touch-inhibit`) must be compiled and SUID must be set, else keyboard
+> shortcuts and touch input won't be blocked. Always use `./install.sh`.
 
 ## Usage
 

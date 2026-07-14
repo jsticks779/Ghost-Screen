@@ -210,6 +210,22 @@ Both backends **auto-restart the window** if it's destroyed (suspend, screen
 lock, display reconfig). The process stays alive until explicitly killed with
 `--kill` or the toggle shortcut.
 
+**Input is blocked while the ghost is active.** You cannot click, type, or
+interact with anything underneath. The ghost consumes all mouse, keyboard,
+and touch events. The only action that works is the toggle shortcut:
+
+| Backend | Mechanism | Blocks |
+|---------|-----------|--------|
+| **Tkinter (X11)** | `grab_set_global()` — X11 global grab | Everything, including WM key bindings |
+| **GTK3 (Wayland)** | `Gdk.Seat.grab()` — compositor seat grab | Client-level input only |
+
+On **X11**, the toggle key is detected internally by the ghost (reads your
+saved shortcut from `~/.config/ghost-screen/shortcut.json`).
+
+On **Wayland**, compositor-level shortcuts (Super key, three-finger swipe,
+Alt+Tab) may still function — this is a Wayland architecture limitation
+(only a screen locker can block compositor input).
+
 A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is already
 displayed — running the script again kills the existing instance (toggle
 behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import tkinter as tk
 import math
 import random
 import os
@@ -8,6 +7,8 @@ import sys
 import signal
 import argparse
 import json
+
+# tkinter is imported lazily — --version and --kill work without it
 
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
@@ -91,6 +92,9 @@ def kill_ghost():
 
 class GhostScreen:
     def __init__(self, cfg=None):
+        import tkinter as tk
+        self.tk = tk
+
         self.cfg = DEFAULT_CONFIG.copy()
         if cfg:
             for k, v in cfg.items():

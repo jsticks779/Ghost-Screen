@@ -176,14 +176,27 @@ cp "$DIR/$SCRIPT" "$CMD"
 chmod +x "$CMD"
 
 # Build and install Wayland shortcut inhibitor (C shared library)
-if command -v gcc &>/dev/null && command -v wayland-scanner &>/dev/null; then
+if command -v gcc &>/dev/null && command -v wayland-scanner &>/dev/null && [ -f "$DIR/wl_inhibit.c" ]; then
     echo "    Building Wayland shortcut inhibitor..."
-    if [ -f "$DIR/wl_ksh_code.c" ] && [ -f "$DIR/wl_inhibit.c" ]; then
+    XML="$DIR/keyboard-shortcuts-inhibit-unstable-v1.xml"
+    [ -f "$XML" ] || XML=""
+    # Fall back to system wayland-protocols
+    if [ -z "$XML" ]; then
+        for d in /usr/share/wayland-protocols /usr/local/share/wayland-protocols; do
+            f="$d/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml"
+            [ -f "$f" ] && { XML="$f"; break; }
+        done
+    fi
+    if [ -n "$XML" ]; then
+        wayland-scanner client-header "$XML" "$DIR/zwp_ksh_client.h" 2>/dev/null && \
+        wayland-scanner private-code "$XML" "$DIR/wl_ksh_code.c" 2>/dev/null && \
         gcc -shared -fPIC -o "$DIR/wl_inhibit.so" \
             "$DIR/wl_inhibit.c" "$DIR/wl_ksh_code.c" \
             $(pkg-config --cflags --libs gtk+-3.0 wayland-client 2>/dev/null) 2>/dev/null && \
         echo "    wl_inhibit.so built OK" || \
-        echo "    wl_inhibit.so build failed (non-fatal)"
+        echo "    wl_inhibit.so build skipped (see above for details)"
+    else
+        echo "    wayland-protocols XML not found — skipping .so build"
     fi
 fi
 

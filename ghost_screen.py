@@ -7,6 +7,8 @@ import sys
 import signal
 import argparse
 import json
+import subprocess
+import shutil
 
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
@@ -113,6 +115,285 @@ def merge_config(cfg):
         else:
             merged[k] = v
     return merged
+
+
+# ─── Shortcut management ───────────────────────────────────────────────
+
+SHORTCUT_DIR = os.path.expanduser("~/.config/ghost-screen")
+SHORTCUT_FILE = os.path.join(SHORTCUT_DIR, "shortcut.json")
+
+_MOD_MAP = {
+    "ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift",
+    "alt": "Alt", "super": "Super", "mod4": "Super",
+    "mod1": "Alt", "primary": "Ctrl",
+}
+
+
+def parse_shortcut(combo):
+    parts = combo.split("+")
+    mods = []
+    for p in parts[:-1]:
+        pn = p.strip().lower()
+        mods.append(_MOD_MAP.get(pn, p.strip()))
+    key = parts[-1].strip()
+    return mods, key
+
+
+def _combo_to_gnome(mods, key):
+    mm = {"Ctrl": "Control", "Alt": "Alt", "Shift": "Shift", "Super": "Super"}
+    ms = "".join(f"<{mm.get(m, m)}>" for m in mods)
+    return ms + (key.lower() if key.isalpha() else key)
+
+
+def detect_de():
+    de = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+    if any(x in de for x in ("gnome", "unity", "budgie", "cinnamon", "mate")):
+        return "gnome" if shutil.which("gsettings") else None
+    if any(x in de for x in ("kde", "plasma")):
+        return "kde"
+    if "xfce" in de:
+        return "xfce"
+    if "sway" in de:
+        return "sway"
+    if "hyprland" in de:
+        return "hyprland"
+    if "river" in de:
+        return "river"
+    if "cosmic" in de:
+        return "cosmic"
+    if any(x in de for x in ("deepin", "dde")):
+        return "deepin" if shutil.which("gsettings") else None
+    if any(x in de for x in ("lxqt", "lumina")):
+        return "lxqt"
+    return None
+
+
+def _get_cmd_path():
+    if "/" in sys.argv[0]:
+        return os.path.abspath(sys.argv[0])
+    w = shutil.which(sys.argv[0])
+    return w or sys.argv[0]
+
+
+def _save_shortcut_config(combo, de):
+    os.makedirs(SHORTCUT_DIR, exist_ok=True)
+    with open(SHORTCUT_FILE, "w") as f:
+        json.dump({"shortcut": combo, "de": de}, f)
+
+
+def _load_shortcut_config():
+    if os.path.exists(SHORTCUT_FILE):
+        try:
+            with open(SHORTCUT_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _gnome(binding, cmd):
+    schema = "org.gnome.settings-daemon.plugins.media-keys"
+    try:
+        cur = subprocess.run(["gsettings", "get", schema, "custom-keybindings"],
+                             capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception as e:
+        return False, f"gsettings failed: {e}"
+    import ast
+    exist = ast.literal_eval(cur) if cur.startswith("[") else []
+    found = None
+    for p in exist:
+        c = subprocess.run(["gsettings", "get", f"{schema}.custom-keybinding:{p}", "command"],
+                           capture_output=True, text=True, timeout=5).stdout.strip().strip("'")
+        if c == cmd:
+            found = p
+            break
+    if found:
+        subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{found}", "binding", binding],
+                       timeout=10)
+        return True, f"Shortcut updated to {binding}"
+    for i in range(100):
+        p = f"/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom{i}/"
+        r = subprocess.run(["gsettings", "get", f"{schema}.custom-keybinding:{p}", "name"],
+                           capture_output=True, text=True, timeout=5)
+        if r.stdout.strip() in ("''", "@as []", "") or r.returncode != 0:
+            subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{p}", "name", "Ghost Screen"],
+                           timeout=5)
+            subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{p}", "command", cmd],
+                           timeout=5)
+            subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{p}", "binding", binding],
+                           timeout=5)
+            exist.append(p)
+            subprocess.run(["gsettings", "set", schema, "custom-keybindings", str(exist)], timeout=5)
+            return True, f"Shortcut set to {binding}"
+    return False, "No empty GNOME custom keybinding slot found"
+
+
+def _kde(combo_str, cmd):
+    kw = shutil.which("kwriteconfig5")
+    if not kw:
+        return False, "kwriteconfig5 not found"
+    try:
+        subprocess.run([kw, "--file", os.path.expanduser("~/.config/kglobalshortcutsrc"),
+                        "--group", "Ghost Screen", "--key", "Ghost Screen",
+                        f"_launch {cmd}"], timeout=10)
+        subprocess.run([kw, "--file", os.path.expanduser("~/.config/kglobalshortcutsrc"),
+                        "--group", "Ghost Screen", "--key", "Ghost Screen",
+                        combo_str], timeout=10)
+        qd = shutil.which("qdbus")
+        if qd:
+            subprocess.run([qd, "org.kde.kglobalaccel", "/kglobalaccel",
+                            "org.kde.KGlobalAccel.reloadConfig"], timeout=10)
+    except Exception as e:
+        return False, f"KDE shortcut failed: {e}"
+    return True, f"Shortcut set to {combo_str}"
+
+
+def _xfce(binding, cmd):
+    xf = shutil.which("xfconf-query")
+    if not xf:
+        return False, "xfconf-query not found"
+    alt = "-".join(binding.replace("<", "").replace(">", ""))
+    try:
+        r = subprocess.run([xf, "-c", "xfce4-keyboard-shortcuts", "-n", "-t", "string",
+                            "-p", f"/commands/custom/{binding}", "-s", cmd],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode == 0:
+            return True, f"Shortcut set to {binding}"
+        r = subprocess.run([xf, "-c", "xfce4-keyboard-shortcuts", "-n", "-t", "string",
+                            "-p", f"/commands/custom/{alt}", "-s", cmd],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode == 0:
+            return True, f"Shortcut set to {alt}"
+    except Exception as e:
+        return False, f"XFCE shortcut failed: {e}"
+    return False, "Could not set XFCE shortcut"
+
+
+def _wlroots_cfg(de, key_text, line_gen):
+    paths = {
+        "sway": os.path.expanduser("~/.config/sway/config"),
+        "hyprland": os.path.expanduser("~/.config/hypr/hyprland.conf"),
+        "river": os.path.expanduser("~/.config/river/init"),
+    }
+    cfg = paths.get(de)
+    if de == "sway" and (not cfg or not os.path.exists(cfg)):
+        alt = os.path.expanduser("~/.config/i3/config")
+        if os.path.exists(alt):
+            cfg = alt
+    if not cfg or not os.path.exists(cfg):
+        return False, f"No {de} config found"
+    cmd = _get_cmd_path()
+    with open(cfg) as f:
+        lines = f.readlines()
+    filtered = [l for l in lines if cmd not in l and "Ghost Screen" not in l]
+    new_line = line_gen(cmd)
+    filtered.append(f"\n# Added by Ghost Screen installer — {key_text} toggles ghost overlay\n")
+    filtered.append(f"{new_line}\n")
+    with open(cfg, "w") as f:
+        f.writelines(filtered)
+    reload = {"sway": "swaymsg reload", "hyprland": "hyprctl reload",
+              "river": "Restart River to activate"}.get(de, "")
+    return True, f"Shortcut set to {key_text}\n    {reload}"
+
+
+def _set_shortcut(combo):
+    mods, key = parse_shortcut(combo)
+    cmd = _get_cmd_path()
+    de = detect_de()
+    combo_str = "+".join(mods + [key])
+
+    handlers = {}
+
+    def _gnome_h():
+        return _gnome(_combo_to_gnome(mods, key), cmd)
+
+    def _deepin_h():
+        return _gnome(_combo_to_gnome(mods, key), cmd)
+
+    def _kde_h():
+        return _kde(combo_str, cmd)
+
+    def _xfce_h():
+        return _xfce(_combo_to_gnome(mods, key), cmd)
+
+    def _sway_h():
+        k = key.lower() if key.isalpha() else key
+        return _wlroots_cfg("sway", f"{'+'.join(mods)}+{k}",
+                            lambda c: f"bindsym {'+'.join(mods)}+{k} exec {c}")
+
+    def _hyprland_h():
+        ms = ", ".join(mods)
+        return _wlroots_cfg("hyprland", f"{ms}+{key}",
+                            lambda c: f"bind = {ms}, {key}, exec, {c}")
+
+    def _river_h():
+        ms = " ".join(mods)
+        return _wlroots_cfg("river", f"{ms}+{key}",
+                            lambda c: f'riverctl map normal {ms} {key} spawn "{c}" &')
+
+    def _lxqt_h():
+        cfg = os.path.expanduser("~/.config/lxqt/globalkeyshortcuts.conf")
+        if not os.path.exists(cfg):
+            return False, "No LXQt config found"
+        with open(cfg) as f:
+            lines = f.readlines()
+        filtered = [l for l in lines if cmd not in l and "[Ghost Screen]" not in l]
+        filtered.append(f"\n[Ghost Screen]\nComment=\nExec={cmd}\nShortcut={combo_str}\n")
+        with open(cfg, "w") as f:
+            f.writelines(filtered)
+        return True, f"Shortcut set to {combo_str}"
+
+    def _xbindkeys_h():
+        if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            return False, "xbindkeys does not work on native Wayland"
+        xbk = shutil.which("xbindkeys")
+        if not xbk:
+            return False, "xbindkeys not found"
+        xm = []
+        for m in mods:
+            ml = m.lower()
+            if ml == "ctrl":
+                xm.append("Control")
+            elif ml == "alt":
+                xm.append("Alt")
+            elif ml == "shift":
+                xm.append("Shift")
+            elif ml == "super":
+                xm.append("Mod4")
+            else:
+                xm.append(m)
+        xk = key.lower() if key.isalpha() else key
+        xc = "+".join(xm + [xk])
+        xrc = os.path.expanduser("~/.xbindkeysrc")
+        with open(xrc, "w") as f:
+            f.write(f'"{cmd}"\n    {xc}\n')
+        ad = os.path.expanduser("~/.config/autostart")
+        os.makedirs(ad, exist_ok=True)
+        with open(os.path.join(ad, "xbindkeys.desktop"), "w") as f:
+            f.write("[Desktop Entry]\nType=Application\nName=xbindkeys\n"
+                    f"Comment=Global keyboard shortcuts (Ghost Screen)\n"
+                    f"Exec=xbindkeys\nTerminal=false\n")
+        subprocess.run(["pkill", "xbindkeys"], capture_output=True, timeout=5)
+        subprocess.run([xbk], timeout=5)
+        return True, f"Shortcut set to {xc}"
+
+    handlers = {
+        "gnome": _gnome_h, "deepin": _deepin_h, "kde": _kde_h,
+        "xfce": _xfce_h, "sway": _sway_h, "hyprland": _hyprland_h,
+        "river": _river_h, "lxqt": _lxqt_h,
+    }
+
+    if de and de in handlers:
+        ok, msg = handlers[de]()
+    elif de == "cosmic":
+        return False, "COSMIC desktop not yet supported for --shortcut"
+    else:
+        ok, msg = _xbindkeys_h() if os.environ.get("XDG_SESSION_TYPE") != "wayland" \
+            else (False, "Could not detect desktop environment")
+
+    if ok:
+        _save_shortcut_config(combo_str, de or "x11")
+    return ok, msg
 
 
 # ─── Shared base class ─────────────────────────────────────────────────
@@ -762,7 +1043,14 @@ def main():
     parser.add_argument("--check", "-c", action="store_true", help="Check dependencies")
     parser.add_argument("--no-sleep", "-n", action="store_true",
                         help="Prevent PC sleep while ghost is active")
+    parser.add_argument("--shortcut", "-s", type=str, metavar="COMBO",
+                        help="Set keyboard shortcut (e.g. Ctrl+Shift+G)")
     args = parser.parse_args()
+
+    if args.shortcut:
+        ok, msg = _set_shortcut(args.shortcut)
+        print(msg)
+        sys.exit(0 if ok else 1)
 
     if args.version:
         print(f"{PROJECT} v{VERSION}")

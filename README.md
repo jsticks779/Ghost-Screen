@@ -8,8 +8,10 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 - Full-screen animated tech ghost with rotating geometric core
 - Circuit trace patterns, floating particles, scan lines, HUD brackets
 - Toggle on/off — same shortcut or command
-- **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River)
+- **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/Deepin/LXQt)
 - **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
+- **Survives sleep/wake** — window auto-restarts after suspend on both backends
+- **Optional sleep block** — `--no-sleep` prevents PC from suspending while ghost is active
 - Auto-darkens on X11 with tkinter (also works on XWayland as a fallback)
 - Customizable colors, opacity, speed, and particle count
 - Dark semi-transparent overlay over your desktop
@@ -32,24 +34,31 @@ cd Ghost-Screen
 ./install.sh
 ```
 
-What `install.sh` does automatically:
-- Installs the right graphics backend for your display server
-- Copies `ghost_screen.py` to `~/.local/bin/ghost-screen`
-- Creates a desktop entry (shows in app menu)
-- **Detects your desktop environment and registers Ctrl+3:**
+The install script auto-detects **everything**:
 
-  | Desktop              | Method                        |
-  |----------------------|-------------------------------|
-  | **GNOME** (Ubuntu)   | `gsettings`                   |
-  | **KDE Plasma**       | `kwriteconfig5` + `qdbus`     |
-  | **XFCE**             | `xfconf-query`                |
-  | **Sway**             | Appends to `~/.config/sway/config` |
-  | **Hyprland**         | Appends to `~/.config/hypr/hyprland.conf` |
-  | **River**            | Appends to `~/.config/river/init` |
-  | **Other Wayland**    | Best-effort; manual setup if needed |
-  | **Other X11**        | `xbindkeys` universal fallback |
+| What | How it's detected |
+|------|-------------------|
+| **Root vs user** | Installs to `/usr/local/bin` (root) or `~/.local/bin` (user) |
+| **Package manager** | `apt` / `pacman` / `dnf` / `zypper` / `apk` / `xbps` |
+| **Display server** | `XDG_SESSION_TYPE` — X11 or Wayland |
+| **Desktop environment** | `XDG_CURRENT_DESKTOP` — GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin, LXQt |
+| **Shell config** | Adds `PATH` to `.bashrc`, `.zshrc`, `.profile` |
+| **Pillow fallback** | If system package missing → tries `pip3 install Pillow` |
 
-- Adds `~/.local/bin` to your `PATH` in `~/.bashrc`
+### Shortcut auto-registration:
+
+| Desktop       | Method |
+|---------------|--------|
+| **GNOME** / Budgie / Cinnamon / MATE | `gsettings` |
+| **KDE Plasma** | `kwriteconfig5` + `qdbus` |
+| **XFCE** | `xfconf-query` |
+| **Sway** | Appends to `~/.config/sway/config` |
+| **Hyprland** | Appends to `~/.config/hypr/hyprland.conf` |
+| **River** | Appends to `~/.config/river/init` |
+| **Deepin** | `gsettings` |
+| **LXQt** | Appends to `~/.config/lxqt/globalkeyshortcuts.conf` |
+| **Other X11** | `xbindkeys` universal fallback |
+| **Other Wayland** | Best-effort; manual setup if needed |
 
 After running it, **Ctrl+3** works immediately — no Settings menu needed.
 
@@ -62,6 +71,30 @@ chmod +x ~/.local/bin/ghost-screen
 ```
 
 Then set a keyboard shortcut in your DE's settings (see below).
+
+## Usage
+
+```bash
+ghost-screen                    # toggle on/off
+ghost-screen --kill             # force stop
+ghost-screen --version          # show version
+ghost-screen --check            # verify dependencies
+ghost-screen --no-sleep         # prevent PC sleep while ghost is active
+ghost-screen --shortcut "COMBO" # change keyboard shortcut
+```
+
+The **only** way to dismiss the ghost is pressing your shortcut again (toggle off).
+
+### Sleep / suspend behavior
+
+| Command | Sleep behavior | After wake |
+|---------|---------------|------------|
+| `ghost-screen` | PC can sleep normally | Ghost auto-restarts the window |
+| `ghost-screen --no-sleep` | **PC cannot sleep** while ghost is active | N/A |
+
+Without `--no-sleep`, the ghost automatically survives suspend/resume on both
+backends (GTK3 and tkinter). If the window is destroyed during sleep, the
+process detects it and recreates the window.
 
 ## Keyboard Shortcut
 
@@ -80,18 +113,24 @@ you lifting a finger. It persists across reboots.
 | **Sway**             | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
 | **Hyprland**         | Add `bind = Ctrl, 3, exec, ~/.local/bin/ghost-screen` to config |
 | **River**            | Add `riverctl map normal Ctrl 3 spawn ~/.local/bin/ghost-screen &` to config |
+| **Deepin**           | Settings → Keyboard → Shortcuts → + → same as GNOME |
+| **LXQt**             | Add to `~/.config/lxqt/globalkeyshortcuts.conf` or use GUI |
 | **Any**              | Use your DE/WM's custom shortcut feature with command `~/.local/bin/ghost-screen` |
 
-## Usage
+### Change shortcut any time — no reinstall needed
+
+After installing, your shortcut is **Ctrl+3** by default. To pick your own:
 
 ```bash
-ghost-screen            # toggle on/off
-ghost-screen --kill     # force stop
-ghost-screen --version  # show version
-ghost-screen --check    # verify dependencies
+ghost-screen --shortcut "Ctrl+Shift+G"
+ghost-screen --shortcut "Super+F1"
+ghost-screen --shortcut "Ctrl+Alt+T"
 ```
 
-The **only** way to dismiss the ghost is pressing your shortcut again (toggle off).
+This detects your desktop environment and updates the shortcut automatically
+— no menus, no re-running the installer. The new shortcut persists across
+reboots. Works on GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin, LXQt,
+and falls back to xbindkeys on other X11 desktops.
 
 ## Customization
 
@@ -133,8 +172,9 @@ cd Ghost-Screen
 ./uninstall.sh
 ```
 
-This removes the binary, desktop entry, **and cleans up the Ctrl+3 shortcut**
-from all desktop environments and wlroots configs.
+This removes the binary (from both `/usr/local/bin` and `~/.local/bin`),
+desktop entry, **and cleans up the Ctrl+3 shortcut** from all desktop
+environments and wlroots configs.
 
 Or do it manually:
 
@@ -157,10 +197,18 @@ Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if
 - **X11** → tkinter window with `-alpha` for transparency, draws with the
   tkinter canvas API
 
+Both backends **auto-restart the window** if it's destroyed (suspend, screen
+lock, display reconfig). The process stays alive until explicitly killed with
+`--kill` or the toggle shortcut.
+
 A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is already
 displayed — running the script again kills the existing instance (toggle
 behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.
 Only the shortcut toggles it off — no click or Escape.
+
+With `--no-sleep`, the script acquires a `systemd-inhibit` sleep lock
+(mode=block) that prevents the PC from suspending. The lock is released
+automatically on toggle-off or `--kill`.
 
 ## License
 

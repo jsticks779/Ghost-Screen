@@ -436,6 +436,16 @@ case "$DE" in
         ;;
 esac
 
+# ── Save shortcut config (for --shortcut command) ─────────────────────
+
+if [ -n "$SHORTCUT_OK" ]; then
+    CONFIG_DIR="$REAL_HOME/.config/ghost-screen"
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_DIR/shortcut.json" << EOF
+{"shortcut": "Ctrl+3", "de": "${DE:-x11}"}
+EOF
+fi
+
 # ── PATH setup (for non-root installs) ────────────────────────────────
 
 if [ "$(id -u)" -ne 0 ]; then

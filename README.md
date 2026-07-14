@@ -127,10 +127,19 @@ ghost-screen --shortcut "Super+F1"
 ghost-screen --shortcut "Ctrl+Alt+T"
 ```
 
-This detects your desktop environment and updates the shortcut automatically
-— no menus, no re-running the installer. The new shortcut persists across
-reboots. Works on GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin, LXQt,
-and falls back to xbindkeys on other X11 desktops.
+**How it works:**
+
+1. Run `ghost-screen --shortcut "Ctrl+Shift+G"`
+2. The script detects your desktop environment (GNOME, KDE, XFCE, etc.)
+3. It translates `Ctrl+Shift+G` into the format your DE expects
+   (e.g. GNOME → `<Control><Shift>g`, Sway → `Ctrl+Shift+g`)
+4. It finds your existing Ghost Screen shortcut and updates its key binding
+   — or creates a new entry if none exists
+5. The new combo is saved to `~/.config/ghost-screen/shortcut.json`
+
+The change is immediate and persists across reboots. No menus, no re-running
+the installer. Works on GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin,
+LXQt, and falls back to xbindkeys on other X11 desktops.
 
 ## Customization
 

@@ -398,6 +398,20 @@ def _set_shortcut(combo):
 
 # ─── Shared base class ─────────────────────────────────────────────────
 
+def _get_toggle_combo():
+    return _load_shortcut_config().get("shortcut", "Ctrl+3")
+
+
+def _combo_to_tk_event(combo):
+    mods, key = parse_shortcut(combo)
+    tk_map = {"ctrl": "Control", "shift": "Shift", "alt": "Alt", "super": "Mod4"}
+    tk_mods = [tk_map.get(m.lower()) for m in mods]
+    if None in tk_mods:
+        return None
+    tk_key = key.lower() if key.isalpha() else key
+    return f"<{' -'.join(tk_mods)}-Key-{tk_key}>"
+
+
 class GhostScreen:
     def __init__(self, cfg=None, no_sleep=False):
         raw = load_config()
@@ -408,6 +422,7 @@ class GhostScreen:
         self._backend = "x11"
         self._quit = False
         self._inhibitor = None
+        self._grab_active = False
         if no_sleep:
             self._acquire_inhibitor()
 
@@ -518,7 +533,44 @@ class TkinterGhostScreen(GhostScreen):
             self.particles = self._init_particles()
             self._write_pid()
 
+        self._grab_input()
         self._after_id = self._root.after(100, self._draw)
+
+    def _grab_input(self):
+        try:
+            self._root.grab_set_global()
+            self._grab_active = True
+        except Exception:
+            self._grab_active = False
+            return
+        combo = _get_toggle_combo()
+        tk_ev = _combo_to_tk_event(combo)
+        if tk_ev:
+            self._root.bind(tk_ev, self._on_toggle_key)
+        self._root.bind("<Key>", self._on_blocked_key)
+        self._root.bind("<Button>", self._on_blocked_key)
+        self._root.bind("<Motion>", self._on_blocked_key)
+
+    def _on_blocked_key(self, event):
+        return "break"
+
+    def _on_toggle_key(self, event):
+        self._quit = True
+        self._grab_active = False
+        root = self._root
+        if root is not None:
+            try:
+                root.grab_release()
+            except Exception:
+                pass
+        self._cleanup_pid()
+        self._on_window_destroy()
+        if root is not None:
+            try:
+                root.quit()
+            except Exception:
+                pass
+        return "break"
 
     def _on_window_destroy(self, event=None):
         if event is not None:
@@ -789,6 +841,36 @@ class GtkGhostScreen(GhostScreen):
         self._window.show_all()
 
         self._window.connect("destroy", self._on_window_destroy)
+        self._grab_input()
+
+    def _grab_input(self):
+        import gi
+        gi.require_version("Gdk", "3.0")
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gdk, Gtk
+        try:
+            gdk_win = self._window.get_window()
+            if not gdk_win:
+                return
+            display = gdk_win.get_display()
+            seat = display.get_default_seat()
+            status = seat.grab(
+                gdk_win, Gdk.SeatCapabilities.ALL,
+                True, None, None, None,
+            )
+            self._grab_active = (status == Gdk.GrabStatus.SUCCESS)
+            if self._grab_active:
+                self._window.connect("key-press-event", self._on_consume)
+                self._window.connect("key-release-event", self._on_consume)
+                self._window.connect("button-press-event", self._on_consume)
+                self._window.connect("button-release-event", self._on_consume)
+                self._window.connect("scroll-event", self._on_consume)
+                self._window.connect("motion-notify-event", self._on_consume)
+        except Exception:
+            self._grab_active = False
+
+    def _on_consume(self, widget, event):
+        return True
 
     def _on_window_destroy(self, *args):
         self._window = None

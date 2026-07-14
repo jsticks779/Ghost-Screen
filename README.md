@@ -219,15 +219,13 @@ is detected internally (no compositor shortcut needed to dismiss).
 |---------|-----------|--------|
 | **Tkinter (X11)** | `grab_set_global()` — X11 global grab | Everything, including WM key bindings |
 | **GTK3 (Wayland, keyboard)** | `zwp_keyboard_shortcuts_inhibit_manager_v1` via C `.so` | Super key, Alt+Tab, all compositor keyboard shortcuts |
-| **GTK3 (Wayland, touchpad)** | `gsettings` disables touchpad device (`send-events disabled`) | Three-finger swipe gestures, scroll, tap, cursor |
-| **GTK3 (Wayland, touchscreen)** | `Gdk.Seat.grab()` + `touch-event` handler | Touchscreen taps, drags, gestures |
+| **GTK3 (Wayland, touch devices)** | SUID C helper inhibits kernel `input` device (`inhibited` sysfs) | Touchpad + touchscreen gestures, scroll, tap, cursor — **every Linux** |
 | **GTK3 (Wayland, client)** | `Gdk.Seat.grab()` seat grab | Mouse clicks, keyboard typing, pointer motion |
 
 On **Wayland**, the ghost uses a multi-layer approach:
 1. **C shared library** binds `zwp_keyboard_shortcuts_inhibit_manager_v1` to block compositor keyboard shortcuts
-2. **gsettings** disables the touchpad device entirely (gestures, scroll, cursor)
-3. **Gdk.Seat.grab** captures all client-level input (keyboard, mouse, touch)
-4. **touch-event handler** consumes touchscreen events at the GTK level
+2. **SUID C helper** inhibits all touch input devices at the kernel-level via sysfs (`/sys/class/input/eventN/device/inhibited`) — works on **any Wayland compositor**, not DE-specific
+3. **Gdk.Seat.grab** + event handlers capture all client-level input (keyboard, mouse, touch)
 
 A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is already
 displayed — running the script again kills the existing instance (toggle

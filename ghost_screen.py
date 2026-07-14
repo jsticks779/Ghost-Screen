@@ -476,11 +476,13 @@ def _inhibit_touchpad():
 def _restore_touchpad():
     _gsettings_restore_all()
 
-_TOUCH_DEV_PATH = None
+_INHIBITED_DEVS = []
 
-def _find_touchscreen():
-    """Find the touchscreen device path (sysfs inhibited file)."""
+def _find_touch_devices():
+    """Find all touch input devices (touchscreen, touchpad) by scanning sysfs.
+       Works on EVERY Linux — not DE-specific. Kernel-level inhibition."""
     base = "/sys/class/input"
+    found = []
     try:
         for name in os.listdir(base):
             if not name.startswith("event"):
@@ -489,37 +491,36 @@ def _find_touchscreen():
             if not os.path.isfile(dev_path):
                 continue
             dev_name = open(dev_path).read().strip().lower()
-            if any(k in dev_name for k in ("touch", "finger")):
+            if any(k in dev_name for k in ("touch", "finger", "touchpad")):
                 inhibited = os.path.join(base, name, "device", "inhibited")
                 if os.path.isfile(inhibited):
-                    return inhibited, name
+                    found.append((inhibited, name))
     except Exception:
         pass
-    return None, None
+    return found
 
-def _inhibit_touchscreen():
-    global _TOUCH_DEV_PATH
-    path, name = _find_touchscreen()
-    if not path:
+def _inhibit_touch_devices():
+    global _INHIBITED_DEVS
+    helper = _find_helper("ghost-touch-inhibit")
+    if not helper:
         return False
-    _TOUCH_DEV_PATH = path
-    helper = _find_helper("ghost-touch-inhibit")
-    if helper:
+    devs = _find_touch_devices()
+    if not devs:
+        return False
+    for _, name in devs:
         subprocess.run([helper, name, "1"], capture_output=True, timeout=5)
-        return True
-    return False
+    _INHIBITED_DEVS = devs
+    return True
 
-def _restore_touchscreen():
-    global _TOUCH_DEV_PATH
-    if not _TOUCH_DEV_PATH:
-        return
-    path, name = _find_touchscreen()
-    if not path:
+def _restore_touch_devices():
+    global _INHIBITED_DEVS
+    if not _INHIBITED_DEVS:
         return
     helper = _find_helper("ghost-touch-inhibit")
     if helper:
-        subprocess.run([helper, name, "0"], capture_output=True, timeout=5)
-    _TOUCH_DEV_PATH = None
+        for _, name in _INHIBITED_DEVS:
+            subprocess.run([helper, name, "0"], capture_output=True, timeout=5)
+    _INHIBITED_DEVS = []
 
 def _find_helper(name):
     d = os.path.dirname(os.path.abspath(__file__))
@@ -969,7 +970,7 @@ class GtkGhostScreen(GhostScreen):
         self._shortcut_blocker = None
         self._gnome_restore = False
         self._touchpad_disabled = False
-        self._touchscreen_inhibited = False
+        self._touch_devs_inhibited = False
         self._toggle_mods = 0
         self._toggle_keyval = 0
         self._init_toggle_key()
@@ -1059,15 +1060,15 @@ class GtkGhostScreen(GhostScreen):
         except Exception:
             pass
 
-        # 2. Disable touchscreen device (blocks all touchscreen input including gestures)
-        if _inhibit_touchscreen():
-            self._touchscreen_inhibited = True
-
-        # 3. Disable touchpad (blocks ALL touchpad input including gestures)
+        # 2. Inhibit all touch devices at kernel level (touchpad + touchscreen)
+        #    Works on EVERY Wayland compositor — not DE-specific.
+        if _inhibit_touch_devices():
+            self._touch_devs_inhibited = True
+        # Also try gsettings touchpad disable (GNOME-specific belt-and-suspenders)
         if _inhibit_touchpad():
             self._touchpad_disabled = True
 
-        # 4. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
+        # 3. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
         if not self._shortcut_blocker:
             if _inhibit_gnome_shortcuts():
                 self._gnome_restore = True
@@ -1125,9 +1126,9 @@ class GtkGhostScreen(GhostScreen):
         self._quit = True
 
     def _cleanup_inhibition(self):
-        if self._touchscreen_inhibited:
-            _restore_touchscreen()
-            self._touchscreen_inhibited = False
+        if self._touch_devs_inhibited:
+            _restore_touch_devices()
+            self._touch_devs_inhibited = False
         if self._touchpad_disabled:
             _restore_touchpad()
             self._touchpad_disabled = False
@@ -1409,7 +1410,7 @@ def main():
         print("Ghost screen dismissed.")
     else:
         atexit.register(_restore_touchpad)
-        atexit.register(_restore_touchscreen)
+        atexit.register(_restore_touch_devices)
         if args.no_sleep:
             print("  Prevent sleep enabled — system will not suspend\n"
                   "  while Ghost Screen is active. Toggle off to allow sleep.")

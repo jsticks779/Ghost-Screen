@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 set -e
 
-BIN="$HOME/.local/bin"
-APP="$HOME/.local/share/applications"
-AUTOSTART="$HOME/.config/autostart"
 NAME="ghost-screen"
-CMD="$BIN/$NAME"
 
 echo "==> Uninstalling Ghost Screen..."
 
-"$CMD" --kill 2>/dev/null || true
+# Try all possible install locations
+for CMD in "$HOME/.local/bin/$NAME" "/usr/local/bin/$NAME"; do
+    [ -f "$CMD" ] || continue
+    "$CMD" --kill 2>/dev/null || true
+    rm -f "$CMD"
+    echo "    Removed $CMD"
+done
 
-rm -f "$CMD"
-rm -f "$APP/ghost-screen.desktop"
-rm -f "$AUTOSTART/xbindkeys.desktop"
+rm -f "$HOME/.local/share/applications/$NAME.desktop"
+rm -f "$HOME/.config/autostart/xbindkeys.desktop"
+rm -f "/usr/local/share/applications/$NAME.desktop" 2>/dev/null || true
 
 # Remove GNOME shortcut
 if command -v gsettings &>/dev/null; then

@@ -25,6 +25,7 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 |---------|------------------|-----------------------------------------|
 | X11     | tkinter          | `python3-tk`                            |
 | Wayland | GTK3 + Pillow    | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
+| Wayland (inhibitor) | C shared library | `gcc`, `pkg-config`, `wayland-scanner` (auto-built by install.sh) |
 
 ## Installation (one command — fully automatic)
 
@@ -210,21 +211,23 @@ Both backends **auto-restart the window** if it's destroyed (suspend, screen
 lock, display reconfig). The process stays alive until explicitly killed with
 `--kill` or the toggle shortcut.
 
-**Input is blocked while the ghost is active.** You cannot click, type, or
-interact with anything underneath. The ghost consumes all mouse, keyboard,
-and touch events. The only action that works is the toggle shortcut:
+**Input is blocked while the ghost is active.** You cannot click, type,
+touch the screen, or interact with anything underneath. The toggle shortcut
+is detected internally (no compositor shortcut needed to dismiss).
 
 | Backend | Mechanism | Blocks |
 |---------|-----------|--------|
 | **Tkinter (X11)** | `grab_set_global()` — X11 global grab | Everything, including WM key bindings |
-| **GTK3 (Wayland)** | `Gdk.Seat.grab()` — compositor seat grab | Client-level input only |
+| **GTK3 (Wayland, keyboard)** | `zwp_keyboard_shortcuts_inhibit_manager_v1` via C `.so` | Super key, Alt+Tab, all compositor keyboard shortcuts |
+| **GTK3 (Wayland, touchpad)** | `gsettings` disables touchpad device (`send-events disabled`) | Three-finger swipe gestures, scroll, tap, cursor |
+| **GTK3 (Wayland, touchscreen)** | `Gdk.Seat.grab()` + `touch-event` handler | Touchscreen taps, drags, gestures |
+| **GTK3 (Wayland, client)** | `Gdk.Seat.grab()` seat grab | Mouse clicks, keyboard typing, pointer motion |
 
-On **X11**, the toggle key is detected internally by the ghost (reads your
-saved shortcut from `~/.config/ghost-screen/shortcut.json`).
-
-On **Wayland**, compositor-level shortcuts (Super key, three-finger swipe,
-Alt+Tab) may still function — this is a Wayland architecture limitation
-(only a screen locker can block compositor input).
+On **Wayland**, the ghost uses a multi-layer approach:
+1. **C shared library** binds `zwp_keyboard_shortcuts_inhibit_manager_v1` to block compositor keyboard shortcuts
+2. **gsettings** disables the touchpad device entirely (gestures, scroll, cursor)
+3. **Gdk.Seat.grab** captures all client-level input (keyboard, mouse, touch)
+4. **touch-event handler** consumes touchscreen events at the GTK level
 
 A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is already
 displayed — running the script again kills the existing instance (toggle

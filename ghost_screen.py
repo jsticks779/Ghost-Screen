@@ -1031,6 +1031,7 @@ class GtkGhostScreen(GhostScreen):
                 self._window.connect("button-release-event", self._on_consume)
                 self._window.connect("scroll-event", self._on_consume)
                 self._window.connect("motion-notify-event", self._on_consume)
+                self._window.connect("touch-event", self._on_consume)
         except Exception:
             self._grab_active = False
 

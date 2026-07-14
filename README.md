@@ -19,7 +19,7 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 
 ## Requirements
 
-- **Linux** with **X11** or **Wayland** (auto-detected)
+- **Linux desktop** — X11 and Wayland are the only two display servers; auto-detected
 - **Python 3** — deps installed automatically by `install.sh`
 
 | Display | Backend          | Required Packages                       |

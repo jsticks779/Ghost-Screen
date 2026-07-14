@@ -599,6 +599,7 @@ class GhostScreen:
         self._backend = "x11"
         self._quit = False
         self._inhibitor = None
+        self._inhibit_fd = None
         self._grab_active = False
         self._acquire_inhibitor()
 
@@ -639,19 +640,45 @@ class GhostScreen:
         self._release_inhibitor()
 
     def _acquire_inhibitor(self):
-        import subprocess
+        self._inhibit_fd = None
+        # Try direct D-Bus approach (most reliable — works on all systemd Linux)
         try:
+            import gi
+            gi.require_version("Gio", "2.0")
+            from gi.repository import Gio, GLib
+            conn = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+            result, fd_list = conn.call_with_unix_fd_list_sync(
+                "org.freedesktop.login1", "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager", "Inhibit",
+                GLib.Variant("(ssss)", ["sleep", "Ghost Screen",
+                                        "Ghost overlay is active", "block"]),
+                GLib.VariantType.new("(h)"),
+                Gio.DBusCallFlags.NONE, -1, None, None,
+            )
+            self._inhibit_fd = fd_list.get(0)
+            return
+        except Exception:
+            pass
+        # Fallback: systemd-inhibit CLI
+        try:
+            import subprocess
             self._inhibitor = subprocess.Popen(
                 ["systemd-inhibit", "--what=sleep", "--who=Ghost Screen",
                  "--why=Ghost overlay is active", "--mode=block", "cat"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
         except Exception:
             self._inhibitor = None
 
     def _release_inhibitor(self):
+        if self._inhibit_fd is not None:
+            try:
+                import os
+                os.close(self._inhibit_fd)
+            except Exception:
+                pass
+            self._inhibit_fd = None
         if self._inhibitor is not None:
             try:
                 self._inhibitor.stdin.close()

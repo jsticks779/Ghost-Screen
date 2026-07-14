@@ -11,7 +11,7 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 - **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/Deepin/LXQt)
 - **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
 - **Survives sleep/wake** — window auto-restarts after suspend on both backends
-- **Optional sleep block** — `--no-sleep` prevents PC from suspending while ghost is active
+- **Blocks PC sleep** while ghost is active — toggle off to allow sleep
 - Auto-darkens on X11 with tkinter (also works on XWayland as a fallback)
 - Customizable colors, opacity, speed, and particle count
 - Dark semi-transparent overlay over your desktop
@@ -79,7 +79,6 @@ ghost-screen                    # toggle on/off
 ghost-screen --kill             # force stop
 ghost-screen --version          # show version
 ghost-screen --check            # verify dependencies
-ghost-screen --no-sleep         # prevent PC sleep while ghost is active
 ghost-screen --shortcut "COMBO" # change keyboard shortcut
 ```
 
@@ -87,14 +86,9 @@ The **only** way to dismiss the ghost is pressing your shortcut again (toggle of
 
 ### Sleep / suspend behavior
 
-| Command | Sleep behavior | After wake |
-|---------|---------------|------------|
-| `ghost-screen` | PC can sleep normally | Ghost auto-restarts the window |
-| `ghost-screen --no-sleep` | **PC cannot sleep** while ghost is active | N/A |
-
-Without `--no-sleep`, the ghost automatically survives suspend/resume on both
-backends (GTK3 and tkinter). If the window is destroyed during sleep, the
-process detects it and recreates the window.
+While the ghost is active, **PC sleep is blocked** automatically (via
+`systemd-inhibit`). The ghost survives suspend/resume on both backends — if the
+window is destroyed during sleep, the process detects it and recreates it.
 
 ## Keyboard Shortcut
 
@@ -231,8 +225,8 @@ displayed — running the script again kills the existing instance (toggle
 behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.
 Only the shortcut toggles it off — no click or Escape.
 
-With `--no-sleep`, the script acquires a `systemd-inhibit` sleep lock
-(mode=block) that prevents the PC from suspending. The lock is released
+The script acquires a `systemd-inhibit` sleep lock (mode=block) while the
+ghost is active, preventing the PC from suspending. The lock is released
 automatically on toggle-off or `--kill`.
 
 ## License

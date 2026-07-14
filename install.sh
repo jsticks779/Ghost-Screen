@@ -205,6 +205,27 @@ if [ -f "$DIR/wl_inhibit.so" ]; then
     chmod +x "$BIN/wl_inhibit.so"
 fi
 
+# Build and install touchscreen inhibitor (SUID helper)
+if command -v gcc &>/dev/null && [ -f "$DIR/ghost_touch_inhibit.c" ]; then
+    echo "    Building touchscreen inhibitor..."
+    gcc -O2 -o "$DIR/ghost-touch-inhibit" "$DIR/ghost_touch_inhibit.c" -Wall 2>/dev/null && \
+    echo "    ghost-touch-inhibit built OK"
+    if [ -f "$DIR/ghost-touch-inhibit" ]; then
+        cp "$DIR/ghost-touch-inhibit" "$BIN/ghost-touch-inhibit"
+        # Set SUID root so non-root user can inhibit touchscreen devices
+        if [ "$(id -u)" -eq 0 ]; then
+            chown root:root "$BIN/ghost-touch-inhibit"
+            chmod u+s "$BIN/ghost-touch-inhibit"
+            echo "    ghost-touch-inhibit SUID set"
+        else
+            sudo chown root:root "$BIN/ghost-touch-inhibit" 2>/dev/null && \
+            sudo chmod u+s "$BIN/ghost-touch-inhibit" 2>/dev/null && \
+            echo "    ghost-touch-inhibit SUID set" || \
+            echo "    ghost-touch-inhibit SUID not set (run with sudo for touchscreen blocking)"
+        fi
+    fi
+fi
+
 cat > "$APP/ghost-screen.desktop" << EOF
 [Desktop Entry]
 Name=Ghost Screen

@@ -347,7 +347,30 @@ class TkinterGhostScreen(GhostScreen):
         self.root.mainloop()
 
 
-# ─── GTK3 backend (Wayland + X11) ─────────────────────────────────────
+# ─── GTK3 backend (Wayland + X11, uses Pillow + GdkPixbuf) ─────────────
+
+def _hex_to_rgba_pil(h, a=255):
+    h = h.lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), a)
+
+
+def _draw_dashed_line(draw, x1, y1, x2, y2, color, width=1, dash=3, gap=6):
+    dx = x2 - x1
+    dy = y2 - y1
+    length = math.sqrt(dx * dx + dy * dy)
+    if length < 0.5:
+        return
+    dx /= length
+    dy /= length
+    pos = 0.0
+    while pos < length:
+        end = min(pos + dash, length)
+        draw.line([
+            (x1 + dx * pos, y1 + dy * pos),
+            (x1 + dx * end, y1 + dy * end),
+        ], fill=color, width=width)
+        pos += dash + gap
+
 
 class GtkGhostScreen(GhostScreen):
     def __init__(self, cfg=None):
@@ -357,9 +380,9 @@ class GtkGhostScreen(GhostScreen):
 
     def _setup_gtk(self):
         import gi
-        gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        from gi.repository import Gtk, Gdk, GLib
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gdk, Gtk, GLib, GdkPixbuf
 
         display = Gdk.Display.get_default()
         if display:
@@ -381,11 +404,10 @@ class GtkGhostScreen(GhostScreen):
         visual = screen.get_rgba_visual()
         if visual:
             self.win.set_visual(visual)
-        self.win.set_events(self.win.get_events())
 
-        self.da = Gtk.DrawingArea()
-        self.win.add(self.da)
-        self.da.connect("draw", self._on_draw)
+        self.image = Gtk.Image()
+        self.win.add(self.image)
+        self.win.show_all()
 
         self.win.connect("destroy", lambda *_: Gtk.main_quit())
 
@@ -393,10 +415,11 @@ class GtkGhostScreen(GhostScreen):
         self._write_pid()
 
         self._gtk_quit = False
+        self._GdkPixbuf = GdkPixbuf
+        self._GLib = GLib
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
 
         GLib.timeout_add(self.cfg["frame_delay"], self._tick)
-        self.win.show_all()
 
     def _signal_quit(self):
         self._gtk_quit = True
@@ -404,196 +427,176 @@ class GtkGhostScreen(GhostScreen):
     def _tick(self):
         if self._gtk_quit:
             self._cleanup_pid()
+            self._gtk_quit = False
+            import gi
+            gi.require_version("Gtk", "3.0")
             from gi.repository import Gtk
             Gtk.main_quit()
             return False
-        self._update()
-        self.da.queue_draw()
-        return True
 
-    def _on_draw(self, widget, cr):
+        self._update()
         t = self.time
         c = self.cfg["colors"]
         cx, cy = self.sw // 2, self.sh // 2
         float_y = math.sin(t * 2) * self.cfg["float_amplitude"]
         gy = cy + float_y
         scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
-        op = self.cfg["opacity"]
 
-        # Window starts transparent with RGBA visual — just draw over it
+        from PIL import Image, ImageDraw
+        img = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
 
-        self._draw_vignette(cr, op)
-        self._draw_grid(cr, t, cx, cy, c["grid"])
-        self._draw_rings(cr, t, cx, gy, scale, c, op)
-        self._draw_ghost(cr, t, cx, gy, scale, c, op)
-        self._draw_particles(cr, t, c["particle"], c["primary"])
-        self._draw_hud(cr, t, cx, gy, scale, c["accent"])
+        self._draw_vignette(draw, t, c)
+        self._draw_grid(draw, t, cx, cy, c["grid"])
+        self._draw_rings(draw, t, cx, gy, scale, c)
+        self._draw_ghost(draw, t, cx, gy, scale, c)
+        self._draw_particles(draw, t, c["particle"], c["primary"])
+        self._draw_hud(draw, t, cx, gy, scale, c["accent"])
+
+        pb = self._GdkPixbuf.Pixbuf.new_from_bytes(
+            self._GLib.Bytes.new(img.tobytes()),
+            self._GdkPixbuf.Colorspace.RGB, True, 8,
+            self.sw, self.sh, self.sw * 4,
+        )
+        self.image.set_from_pixbuf(pb)
 
         return True
 
-    def _draw_vignette(self, cr, op):
+    # ── Drawing helpers ───────────────────────────────────────────
+
+    def _draw_vignette(self, draw, t, c):
         w, h = self.sw, self.sh
         for i in range(5):
             r = 1 - i * 0.15
-            alpha = i * 0.03 * op
-            cr.set_source_rgba(0, 0, 0, alpha)
-            cr.rectangle(w*(1-r)/2, h*(1-r)/2, w*r, h*r)
-            cr.fill()
+            alpha = int(i * 0.03 * self.cfg["opacity"] * 255)
+            x0 = int(w * (1 - r) / 2)
+            y0 = int(h * (1 - r) / 2)
+            x1 = int(w * (1 + r) / 2)
+            y1 = int(h * (1 + r) / 2)
+            draw.rectangle([x0, y0, x1, y1], fill=(0, 0, 0, alpha))
 
-    def _draw_grid(self, cr, t, cx, cy, color):
+    def _draw_grid(self, draw, t, cx, cy, color):
         spacing = 60
         off = (t * 8) % spacing
-        cr.set_source_rgba(*hex_to_rgba(color, 0.3))
-        cr.set_line_width(1)
+        col = _hex_to_rgba_pil(color, 76)
         for x in range(int(cx % spacing), self.sw, spacing):
-            cr.move_to(x + off, 0)
-            cr.line_to(x + off, self.sh)
-            cr.stroke()
+            draw.line([(x + off, 0), (x + off, self.sh)], fill=col, width=1)
         for y in range(int(cy % spacing), self.sh, spacing):
-            cr.move_to(0, y + off)
-            cr.line_to(self.sw, y + off)
-            cr.stroke()
+            draw.line([(0, y + off), (self.sw, y + off)], fill=col, width=1)
 
-    def _draw_rings(self, cr, t, cx, cy, scale, c, op):
-        radii = [scale*1.8, scale*2.3, scale*2.8]
+    def _draw_rings(self, draw, t, cx, cy, scale, c):
+        radii = [scale * 1.8, scale * 2.3, scale * 2.8]
         colors = [c["primary"], c["secondary"], c["accent"]]
         speeds = [0.3, -0.2, 0.15]
         segs = 48
         gap = 6
+        op = self.cfg["opacity"]
         for r, col, sp in zip(radii, colors, speeds):
             angle = t * sp
-            cr.set_source_rgba(*hex_to_rgba(col, op))
-            cr.set_line_width(1)
+            pil_col = _hex_to_rgba_pil(col, int(op * 255))
             for j in range(0, segs, gap):
-                a1 = angle + (j/segs) * 2 * math.pi
-                a2 = angle + ((j+gap-1)/segs) * 2 * math.pi
-                cr.arc(cx, cy, r, a1, a2)
-                cr.stroke()
+                a1 = math.degrees(angle + (j / segs) * 2 * math.pi)
+                a2 = math.degrees(angle + ((j + gap - 1) / segs) * 2 * math.pi)
+                draw.arc([cx - r, cy - r, cx + r, cy + r], a1, a2, fill=pil_col, width=1)
+        accent_col = _hex_to_rgba_pil(c["accent"], int(op * 0.6 * 255))
         for j in range(4):
-            a = t*0.2 + j*math.pi/2
-            x1 = cx + radii[0]*math.cos(a)
-            y1 = cy + radii[0]*math.sin(a)
-            x2 = cx + radii[2]*math.cos(a)
-            y2 = cy + radii[2]*math.sin(a)
-            cr.set_source_rgba(*hex_to_rgba(c["accent"], op * 0.6))
-            cr.set_dash([3, 6])
-            cr.move_to(x1, y1)
-            cr.line_to(x2, y2)
-            cr.stroke()
-            cr.set_dash([])
+            a = t * 0.2 + j * math.pi / 2
+            x1 = cx + radii[0] * math.cos(a)
+            y1 = cy + radii[0] * math.sin(a)
+            x2 = cx + radii[2] * math.cos(a)
+            y2 = cy + radii[2] * math.sin(a)
+            _draw_dashed_line(draw, x1, y1, x2, y2, accent_col, width=1, dash=3, gap=6)
 
-    def _draw_ghost(self, cr, t, cx, cy, scale, c, op):
-        # Body
-        cr.set_source_rgba(*hex_to_rgba(c["ghost_fill"], op * 0.9))
-        first = True
-        for px, py in GHOST_POLYGON:
-            x, y = cx + px * scale, cy + py * scale
-            if first:
-                cr.move_to(x, y)
-                first = False
-            else:
-                cr.line_to(x, y)
-        cr.close_path()
-        cr.fill_preserve()
-        cr.set_source_rgba(*hex_to_rgba(c["ghost_outline"], op))
-        cr.set_line_width(2)
-        cr.stroke()
+    def _draw_ghost(self, draw, t, cx, cy, scale, c):
+        op = self.cfg["opacity"]
+        ghost_pts = [(cx + px * scale, cy + py * scale) for px, py in GHOST_POLYGON]
+        draw.polygon(
+            ghost_pts,
+            fill=_hex_to_rgba_pil(c["ghost_fill"], int(op * 0.9 * 255)),
+            outline=_hex_to_rgba_pil(c["ghost_outline"], int(op * 255)),
+        )
 
-        # Circuits
         for i, path in enumerate(CIRCUIT_PATHS):
             col = c["primary"] if i % 2 == 0 else c["secondary"]
-            cr.set_source_rgba(*hex_to_rgba(col, op))
-            cr.set_line_width(1.5)
+            pil_col = _hex_to_rgba_pil(col, int(op * 255))
             for j in range(len(path) - 1):
-                cr.move_to(cx + path[j][0]*scale, cy + path[j][1]*scale)
-                cr.line_to(cx + path[j+1][0]*scale, cy + path[j+1][1]*scale)
-                cr.stroke()
+                draw.line([
+                    (cx + path[j][0] * scale, cy + path[j][1] * scale),
+                    (cx + path[j + 1][0] * scale, cy + path[j + 1][1] * scale),
+                ], fill=pil_col, width=2)
             for px, py in path:
-                cr.arc(cx + px*scale, cy + py*scale, 3, 0, 2*math.pi)
-                cr.fill()
+                x, y = cx + px * scale, cy + py * scale
+                draw.ellipse([x - 3, y - 3, x + 3, y + 3], fill=pil_col)
 
-        # Core
         r = scale * 0.18
         angle = t * 2
-        cr.set_source_rgba(*hex_to_rgba(c["secondary"], op))
-        cr.set_line_width(2)
-        first = True
-        for i in range(8):
-            a = angle + i * math.pi/4
-            x, y = cx + r*math.cos(a), cy + r*math.sin(a)
-            if first:
-                cr.move_to(x, y)
-                first = False
-            else:
-                cr.line_to(x, y)
-        cr.close_path()
-        cr.fill_preserve()
-        cr.set_source_rgba(*hex_to_rgba(c["ghost_fill"], op))
-        cr.fill()
+        core_pts = [
+            (cx + r * math.cos(angle + i * math.pi / 4),
+             cy + r * math.sin(angle + i * math.pi / 4))
+            for i in range(8)
+        ]
+        draw.polygon(
+            core_pts,
+            fill=_hex_to_rgba_pil(c["ghost_fill"], int(op * 255)),
+            outline=_hex_to_rgba_pil(c["secondary"], int(op * 255)),
+        )
+        draw.ellipse(
+            [cx - r * 0.4, cy - r * 0.4, cx + r * 0.4, cy + r * 0.4],
+            fill=_hex_to_rgba_pil(c["primary"], int(op * 255)),
+        )
 
-        cr.set_source_rgba(*hex_to_rgba(c["primary"], op))
-        cr.arc(cx, cy, r*0.4, 0, 2*math.pi)
-        cr.fill()
-
-        # Eyes
         eye_y = cy - scale * 0.28
         spread = scale * 0.18
         pulse = 1 + 0.15 * math.sin(t * 3)
         for side in [-1, 1]:
             ex = cx + side * spread
             eye_r = 6 * pulse
-            cr.set_source_rgba(*hex_to_rgba(c["primary"], op))
-            first = True
-            for i in range(6):
-                a = i * math.pi/3 + t * 0.5
-                x, y = ex + eye_r*math.cos(a), eye_y + eye_r*math.sin(a)
-                if first:
-                    cr.move_to(x, y)
-                    first = False
-                else:
-                    cr.line_to(x, y)
-            cr.close_path()
-            cr.fill()
+            eye_pts = [
+                (ex + eye_r * math.cos(i * math.pi / 3 + t * 0.5),
+                 eye_y + eye_r * math.sin(i * math.pi / 3 + t * 0.5))
+                for i in range(6)
+            ]
+            draw.polygon(eye_pts, fill=_hex_to_rgba_pil(c["primary"], int(op * 255)))
 
-        # Glow rings
         for i in range(3):
             gr = scale * 0.7 * (1 + i * 0.15)
-            cr.set_source_rgba(*hex_to_rgba(c["glow"], op * 0.15))
-            cr.arc(cx, cy, gr, 0, 2*math.pi)
-            cr.set_line_width(1)
-            cr.stroke()
+            draw.ellipse(
+                [cx - gr, cy - gr, cx + gr, cy + gr],
+                outline=_hex_to_rgba_pil(c["glow"], int(op * 0.15 * 255)),
+                width=1,
+            )
 
-    def _draw_particles(self, cr, t, color, glow_color):
+    def _draw_particles(self, draw, t, color, glow_color):
         for p in self.particles:
             twinkle = 0.5 + 0.5 * math.sin(t * 3 + p["phase"])
             sz = p["size"] * twinkle
-            cr.set_source_rgba(*hex_to_rgba(color, twinkle))
-            cr.arc(p["x"], p["y"], sz, 0, 2*math.pi)
-            cr.fill()
-            cr.set_source_rgba(*hex_to_rgba(glow_color, twinkle * 0.3))
-            cr.arc(p["x"], p["y"], sz*2, 0, 2*math.pi)
-            cr.fill()
+            col = _hex_to_rgba_pil(color, int(twinkle * 255))
+            glow = _hex_to_rgba_pil(glow_color, int(twinkle * 0.3 * 255))
+            draw.ellipse(
+                [p["x"] - sz, p["y"] - sz, p["x"] + sz, p["y"] + sz],
+                fill=col,
+            )
+            draw.ellipse(
+                [p["x"] - sz * 0.5, p["y"] - sz * 0.5,
+                 p["x"] + sz * 0.5, p["y"] + sz * 0.5],
+                fill=glow,
+            )
 
-    def _draw_hud(self, cr, t, cx, cy, scale, color):
+    def _draw_hud(self, draw, t, cx, cy, scale, color):
         spread = scale * 2.0
         sz = scale * 0.15
+        col = _hex_to_rgba_pil(color, 128)
         corners = [
-            (cx-spread, cy-spread, 1, 1),
-            (cx+spread, cy-spread, -1, 1),
-            (cx-spread, cy+spread, 1, -1),
-            (cx+spread, cy+spread, -1, -1),
+            (cx - spread, cy - spread, 1, 1),
+            (cx + spread, cy - spread, -1, 1),
+            (cx - spread, cy + spread, 1, -1),
+            (cx + spread, cy + spread, -1, -1),
         ]
-        cr.set_source_rgba(*hex_to_rgba(color, 0.5))
-        cr.set_line_width(1)
         for x, y, dx, dy in corners:
-            cr.move_to(x, y+sz*dy)
-            cr.line_to(x, y)
-            cr.line_to(x+sz*dx, y)
-            cr.stroke()
+            draw.line([(x, y + sz * dy), (x, y)], fill=col, width=1)
+            draw.line([(x, y), (x + sz * dx, y)], fill=col, width=1)
         scan_y = (t * 60) % self.sh
-        cr.move_to(0, scan_y)
-        cr.line_to(self.sw, scan_y)
-        cr.stroke()
+        draw.line([(0, scan_y), (self.sw, scan_y)], fill=col, width=1)
 
     def run(self):
         from gi.repository import Gtk
@@ -606,9 +609,12 @@ def create_ghost_screen(cfg=None):
     display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
     if display_type == "wayland":
         try:
+            from PIL import Image, ImageDraw
             return GtkGhostScreen(cfg)
-        except Exception:
-            print("Falling back to X11 mode (black background on Wayland).")
+        except ImportError:
+            print("Pillow not installed; install python3-pil for Wayland transparency.")
+        except Exception as e:
+            print(f"Wayland backend failed ({e}), falling back to X11.")
     return TkinterGhostScreen(cfg)
 
 

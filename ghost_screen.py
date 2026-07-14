@@ -459,31 +459,21 @@ def _gsettings_restore_all():
             pass
     _GSETTINGS_SAVED.clear()
 
-def _inhibit_gesture_triggers():
-    """Disable gsettings keybindings that touchpad gestures trigger."""
+def _inhibit_touchpad():
+    """Disable touchpad via gsettings while ghost is active.
+       This is the only way to block touch gestures on Wayland without
+       ext-session-lock protocol (which GNOME 46 does not advertise)."""
     de = os.environ.get("XDG_SESSION_TYPE") == "wayland" and detect_de() == "gnome"
     if not de:
         return False
-    pairs = [
-        ("org.gnome.shell.keybindings", "toggle-overview"),
-        ("org.gnome.shell.keybindings", "toggle-application-view"),
-        ("org.gnome.desktop.wm.keybindings", "switch-to-workspace-left"),
-        ("org.gnome.desktop.wm.keybindings", "switch-to-workspace-right"),
-        ("org.gnome.desktop.wm.keybindings", "switch-applications"),
-        ("org.gnome.desktop.wm.keybindings", "switch-windows"),
-        ("org.gnome.desktop.wm.keybindings", "switch-group"),
-        ("org.gnome.shell.keybindings", "focus-active-notification"),
-        ("org.gnome.desktop.wm.keybindings", "show-desktop"),
-    ]
-    saved_any = False
-    for schema, key in pairs:
-        if _gsettings_save(schema, key):
-            subprocess.run(["gsettings", "set", schema, key, "@as []"],
-                           capture_output=True, timeout=5)
-            saved_any = True
-    return saved_any
+    schema = "org.gnome.desktop.peripherals.touchpad"
+    if _gsettings_save(schema, "send-events"):
+        subprocess.run(["gsettings", "set", schema, "send-events", "disabled"],
+                       capture_output=True, timeout=5)
+        return True
+    return False
 
-def _restore_gesture_triggers():
+def _restore_touchpad():
     _gsettings_restore_all()
 
 
@@ -923,7 +913,7 @@ class GtkGhostScreen(GhostScreen):
         self._GLib = None
         self._shortcut_blocker = None
         self._gnome_restore = False
-        self._gesture_saved = False
+        self._touchpad_disabled = False
         self._toggle_mods = 0
         self._toggle_keyval = 0
         self._init_toggle_key()
@@ -1013,9 +1003,9 @@ class GtkGhostScreen(GhostScreen):
         except Exception:
             pass
 
-        # 2. Disable gsettings keybindings triggered by touch gestures
-        if _inhibit_gesture_triggers():
-            self._gesture_saved = True
+        # 2. Disable touchpad (blocks ALL touchpad input including gestures)
+        if _inhibit_touchpad():
+            self._touchpad_disabled = True
 
         # 3. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
         if not self._shortcut_blocker:
@@ -1071,9 +1061,9 @@ class GtkGhostScreen(GhostScreen):
         self._quit = True
 
     def _cleanup_inhibition(self):
-        if self._gesture_saved:
-            _restore_gesture_triggers()
-            self._gesture_saved = False
+        if self._touchpad_disabled:
+            _restore_touchpad()
+            self._touchpad_disabled = False
         if self._gnome_restore:
             _restore_gnome_shortcuts()
             self._gnome_restore = False
@@ -1351,7 +1341,7 @@ def main():
         kill_ghost()
         print("Ghost screen dismissed.")
     else:
-        atexit.register(_restore_gesture_triggers)
+        atexit.register(_restore_touchpad)
         if args.no_sleep:
             print("  Prevent sleep enabled — system will not suspend\n"
                   "  while Ghost Screen is active. Toggle off to allow sleep.")

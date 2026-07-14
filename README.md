@@ -14,11 +14,10 @@ keyboard shortcut for a cyberpunk holographic screensaver effect.
 
 ## Requirements
 
-- **Linux** with X11 (default on most distros — Wayland has limited transparency)
-- **Python 3** — tkinter is auto-installed if missing
+- **Linux** with X11 or Wayland (auto-detected, both supported)
+- **Python 3** — tkinter (X11) or GTK3 (Wayland) auto-installed
 
-> **Wayland note**: log out and select "Ubuntu on Xorg" at login if transparency
-> doesn't render correctly.
+> **Wayland note**: transparency works out of the box — uses GTK3 backend automatically.
 
 ## Installation (one command — fully automatic)
 
@@ -29,7 +28,7 @@ cd Ghost-Screen
 ```
 
 What `install.sh` does automatically:
-- Installs `python3-tk` if missing
+- Installs the right graphics backend (**tkinter** for X11, **GTK3** for Wayland)
 - Copies `ghost_screen.py` to `~/.local/bin/ghost-screen`
 - Creates a desktop entry (shows in app menu)
 - **Detects your desktop environment and registers Ctrl+3:**

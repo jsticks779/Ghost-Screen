@@ -12,14 +12,27 @@ CMD="$BIN/$NAME"
 echo "==> Installing Ghost Screen..."
 
 # ── Dependencies ──────────────────────────────────────────────────────
-if ! python3 -c "import tkinter" 2>/dev/null; then
-    echo "    python3-tk not found. Attempting to install..."
-    if command -v apt-get &>/dev/null; then
-        sudo apt-get install -y python3-tk || echo "    Could not install python3-tk"
-    elif command -v pacman &>/dev/null; then
-        sudo pacman -S --noconfirm tk || echo "    Could not install tk"
-    elif command -v dnf &>/dev/null; then
-        sudo dnf install -y python3-tkinter || echo "    Could not install python3-tkinter"
+if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+    if ! python3 -c "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk" 2>/dev/null; then
+        echo "    GTK3 not found (required for Wayland). Installing..."
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y python3-gi gir1.2-gtk-3.0 || echo "    Could not install GTK3"
+        elif command -v pacman &>/dev/null; then
+            sudo pacman -S --noconfirm python-gobject gtk3 || echo "    Could not install GTK3"
+        elif command -v dnf &>/dev/null; then
+            sudo dnf install -y python3-gobject gtk3 || echo "    Could not install GTK3"
+        fi
+    fi
+else
+    if ! python3 -c "import tkinter" 2>/dev/null; then
+        echo "    python3-tk not found. Attempting to install..."
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y python3-tk || echo "    Could not install python3-tk"
+        elif command -v pacman &>/dev/null; then
+            sudo pacman -S --noconfirm tk || echo "    Could not install tk"
+        elif command -v dnf &>/dev/null; then
+            sudo dnf install -y python3-tkinter || echo "    Could not install python3-tkinter"
+        fi
     fi
 fi
 
@@ -41,9 +54,7 @@ chmod +x "$APP/ghost-screen.desktop"
 
 # ── Wayland check ─────────────────────────────────────────────────────
 if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
-    echo ""
-    echo "  WARNING: You are on Wayland. Transparent overlays don't work here."
-    echo "  To fix: Log out -> click gear -> 'Ubuntu on Xorg' -> log in"
+    echo "    Wayland detected — using GTK3 backend for transparency."
 fi
 
 # ── Try each desktop environment ──────────────────────────────────────

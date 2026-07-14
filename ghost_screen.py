@@ -8,8 +8,6 @@ import signal
 import argparse
 import json
 
-# tkinter is imported lazily — --version and --kill work without it
-
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
 PID_FILE = "/tmp/ghost_screen.pid"
@@ -90,59 +88,67 @@ def kill_ghost():
     return True
 
 
+def hex_to_rgba(h, a=1.0):
+    h = h.lstrip("#")
+    return (int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0,
+            int(h[4:6], 16) / 255.0, a)
+
+
+def load_config():
+    cfg = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE) as f:
+                cfg = json.load(f)
+        except Exception:
+            pass
+    return cfg
+
+
+def merge_config(cfg):
+    merged = DEFAULT_CONFIG.copy()
+    for k, v in cfg.items():
+        if k == "colors" and isinstance(v, dict):
+            merged["colors"].update(v)
+        else:
+            merged[k] = v
+    return merged
+
+
+# ─── Shared base class ─────────────────────────────────────────────────
+
 class GhostScreen:
     def __init__(self, cfg=None):
-        import tkinter as tk
-        self.tk = tk
-
-        self.cfg = DEFAULT_CONFIG.copy()
-        if cfg:
-            for k, v in cfg.items():
-                if k == "colors" and isinstance(v, dict):
-                    self.cfg["colors"].update(v)
-                else:
-                    self.cfg[k] = v
-
-        self.root = self.tk.Tk()
-        self._setup_window()
-        self._setup_canvas()
-        self._init_particles()
-        self._bind_events()
-        self._write_pid()
-
-    def _setup_window(self):
-        self.root.title(PROJECT)
-        self.root.attributes("-fullscreen", True)
-        self.root.attributes("-topmost", True)
-        self.root.attributes("-alpha", self.cfg["opacity"])
-        self.root.overrideredirect(True)
-        self.sw = self.root.winfo_screenwidth()
-        self.sh = self.root.winfo_screenheight()
-
-    def _setup_canvas(self):
-        self.canvas = self.tk.Canvas(
-            self.root,
-            width=self.sw, height=self.sh,
-            highlightthickness=0,
-            bg=self.cfg["colors"]["bg"],
-        )
-        self.canvas.pack()
+        raw = load_config()
+        raw.update(cfg or {})
+        self.cfg = merge_config(raw)
+        self.time = 0.0
+        self.sw, self.sh = 0, 0
+        self._backend = "x11"
 
     def _init_particles(self):
-        self.time = 0.0
-        self.particles = []
-        for _ in range(self.cfg["particle_count"]):
-            self.particles.append({
-                "x": random.uniform(0, self.sw),
-                "y": random.uniform(0, self.sh),
-                "vx": random.uniform(-0.4, 0.4),
-                "vy": random.uniform(-0.5, -0.15),
-                "size": random.uniform(1.5, 3.5),
-                "phase": random.uniform(0, 2 * math.pi),
-            })
+        return [{
+            "x": random.uniform(0, self.sw),
+            "y": random.uniform(0, self.sh),
+            "vx": random.uniform(-0.4, 0.4),
+            "vy": random.uniform(-0.5, -0.15),
+            "size": random.uniform(1.5, 3.5),
+            "phase": random.uniform(0, 2 * math.pi),
+        } for _ in range(self.cfg["particle_count"])]
 
-    def _bind_events(self):
-        signal.signal(signal.SIGTERM, lambda *_: os._exit(0))
+    def _update_particles(self):
+        for p in self.particles:
+            p["x"] += p["vx"]
+            p["y"] += p["vy"]
+            if p["y"] < -20:
+                p["y"] = self.sh + 20
+                p["x"] = random.uniform(0, self.sw)
+            if p["x"] < -20 or p["x"] > self.sw + 20:
+                p["x"] = random.uniform(0, self.sw)
+
+    def _update(self):
+        self.time += self.cfg["frame_delay"] / 1000.0
+        self._update_particles()
 
     def _write_pid(self):
         with open(PID_FILE, "w") as f:
@@ -155,17 +161,46 @@ class GhostScreen:
         except OSError:
             pass
 
+    def run(self):
+        raise NotImplementedError
+
+
+# ─── Tkinter backend (X11) ────────────────────────────────────────────
+
+class TkinterGhostScreen(GhostScreen):
+    def __init__(self, cfg=None):
+        import tkinter as tk
+        super().__init__(cfg)
+        self._backend = "x11"
+
+        self.root = tk.Tk()
+        self.root.title(PROJECT)
+        self.root.attributes("-fullscreen", True)
+        self.root.attributes("-topmost", True)
+        self.root.attributes("-alpha", self.cfg["opacity"])
+        self.root.overrideredirect(True)
+        self.sw = self.root.winfo_screenwidth()
+        self.sh = self.root.winfo_screenheight()
+
+        self.canvas = tk.Canvas(
+            self.root, width=self.sw, height=self.sh,
+            highlightthickness=0, bg=self.cfg["colors"]["bg"],
+        )
+        self.canvas.pack()
+
+        self.particles = self._init_particles()
+        self._write_pid()
+        signal.signal(signal.SIGTERM, lambda *_: os._exit(0))
+
     def draw(self):
         self.canvas.delete("all")
-        self.time += self.cfg["frame_delay"] / 1000.0
+        self._update()
         t = self.time
-
+        c = self.cfg["colors"]
         cx, cy = self.sw // 2, self.sh // 2
         float_y = math.sin(t * 2) * self.cfg["float_amplitude"]
         gy = cy + float_y
         scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
-
-        c = self.cfg["colors"]
 
         self._draw_vignette()
         self._draw_grid(t, cx, cy, c["grid"])
@@ -199,7 +234,6 @@ class GhostScreen:
         speeds = [0.3, -0.2, 0.15]
         segs = 48
         gap = 6
-
         for r, col, sp in zip(radii, colors, speeds):
             angle = t * sp
             for j in range(0, segs, gap):
@@ -211,7 +245,6 @@ class GhostScreen:
                     extent=math.degrees(a2-a1),
                     outline=col, width=1, style="arc",
                 )
-
         for j in range(4):
             a = t*0.2 + j*math.pi/2
             x1 = cx + radii[0]*math.cos(a)
@@ -282,13 +315,6 @@ class GhostScreen:
 
     def _draw_particles(self, t, color, glow_color):
         for p in self.particles:
-            p["x"] += p["vx"]
-            p["y"] += p["vy"]
-            if p["y"] < -20:
-                p["y"] = self.sh + 20
-                p["x"] = random.uniform(0, self.sw)
-            if p["x"] < -20 or p["x"] > self.sw + 20:
-                p["x"] = random.uniform(0, self.sw)
             twinkle = 0.5 + 0.5 * math.sin(t * 3 + p["phase"])
             sz = p["size"] * twinkle
             self.canvas.create_oval(
@@ -313,14 +339,280 @@ class GhostScreen:
         for x, y, dx, dy in corners:
             self.canvas.create_line(x, y+sz*dy, x, y, fill=color, width=1)
             self.canvas.create_line(x, y, x+sz*dx, y, fill=color, width=1)
-
         scan_y = (t * 60) % self.sh
         self.canvas.create_line(0, scan_y, self.sw, scan_y, fill=color, width=1)
-        self.canvas.create_line(0, scan_y+2, self.sw, scan_y+2, fill=color, width=1, dash=(2, 10))
 
     def run(self):
         self.root.after(100, self.draw)
         self.root.mainloop()
+
+
+# ─── GTK3 backend (Wayland + X11) ─────────────────────────────────────
+
+class GtkGhostScreen(GhostScreen):
+    def __init__(self, cfg=None):
+        super().__init__(cfg)
+        self._backend = "wayland"
+        self._setup_gtk()
+
+    def _setup_gtk(self):
+        import gi
+        gi.require_version("Gtk", "3.0")
+        gi.require_version("Gdk", "3.0")
+        from gi.repository import Gtk, Gdk, GLib
+
+        display = Gdk.Display.get_default()
+        if display:
+            mon = (display.get_monitor(0) or
+                   (getattr(display, "get_primary_monitor", lambda: None)()))
+            if mon:
+                geo = mon.get_geometry()
+                self.sw, self.sh = geo.width, geo.height
+        if not self.sw:
+            self.sw, self.sh = 1920, 1080  # fallback
+
+        self.win = Gtk.Window()
+        self.win.set_title(PROJECT)
+        self.win.set_app_paintable(True)
+        self.win.set_keep_above(True)
+        self.win.fullscreen()
+
+        screen = self.win.get_screen()
+        visual = screen.get_rgba_visual()
+        if visual:
+            self.win.set_visual(visual)
+        self.win.set_events(self.win.get_events())
+
+        self.da = Gtk.DrawingArea()
+        self.win.add(self.da)
+        self.da.connect("draw", self._on_draw)
+
+        self.win.connect("destroy", lambda *_: Gtk.main_quit())
+
+        self.particles = self._init_particles()
+        self._write_pid()
+
+        self._gtk_quit = False
+        signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
+
+        GLib.timeout_add(self.cfg["frame_delay"], self._tick)
+        self.win.show_all()
+
+    def _signal_quit(self):
+        self._gtk_quit = True
+
+    def _tick(self):
+        if self._gtk_quit:
+            self._cleanup_pid()
+            from gi.repository import Gtk
+            Gtk.main_quit()
+            return False
+        self._update()
+        self.da.queue_draw()
+        return True
+
+    def _on_draw(self, widget, cr):
+        t = self.time
+        c = self.cfg["colors"]
+        cx, cy = self.sw // 2, self.sh // 2
+        float_y = math.sin(t * 2) * self.cfg["float_amplitude"]
+        gy = cy + float_y
+        scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
+        op = self.cfg["opacity"]
+
+        # Background (transparent via RGBA visual)
+        bg = c["bg"]
+        cr.set_source_rgba(*hex_to_rgba(bg, 0))
+        cr.paint()
+
+        self._draw_vignette(cr, op)
+        self._draw_grid(cr, t, cx, cy, c["grid"])
+        self._draw_rings(cr, t, cx, gy, scale, c, op)
+        self._draw_ghost(cr, t, cx, gy, scale, c, op)
+        self._draw_particles(cr, t, c["particle"], c["primary"])
+        self._draw_hud(cr, t, cx, gy, scale, c["accent"])
+
+        return True
+
+    def _draw_vignette(self, cr, op):
+        w, h = self.sw, self.sh
+        for i in range(5):
+            r = 1 - i * 0.15
+            alpha = i * 0.03 * op
+            cr.set_source_rgba(0, 0, 0, alpha)
+            cr.rectangle(w*(1-r)/2, h*(1-r)/2, w*r, h*r)
+            cr.fill()
+
+    def _draw_grid(self, cr, t, cx, cy, color):
+        spacing = 60
+        off = (t * 8) % spacing
+        cr.set_source_rgba(*hex_to_rgba(color, 0.3))
+        cr.set_line_width(1)
+        for x in range(int(cx % spacing), self.sw, spacing):
+            cr.move_to(x + off, 0)
+            cr.line_to(x + off, self.sh)
+            cr.stroke()
+        for y in range(int(cy % spacing), self.sh, spacing):
+            cr.move_to(0, y + off)
+            cr.line_to(self.sw, y + off)
+            cr.stroke()
+
+    def _draw_rings(self, cr, t, cx, cy, scale, c, op):
+        radii = [scale*1.8, scale*2.3, scale*2.8]
+        colors = [c["primary"], c["secondary"], c["accent"]]
+        speeds = [0.3, -0.2, 0.15]
+        segs = 48
+        gap = 6
+        for r, col, sp in zip(radii, colors, speeds):
+            angle = t * sp
+            cr.set_source_rgba(*hex_to_rgba(col, op))
+            cr.set_line_width(1)
+            for j in range(0, segs, gap):
+                a1 = angle + (j/segs) * 2 * math.pi
+                a2 = angle + ((j+gap-1)/segs) * 2 * math.pi
+                cr.arc(cx, cy, r, a1, a2)
+                cr.stroke()
+        for j in range(4):
+            a = t*0.2 + j*math.pi/2
+            x1 = cx + radii[0]*math.cos(a)
+            y1 = cy + radii[0]*math.sin(a)
+            x2 = cx + radii[2]*math.cos(a)
+            y2 = cy + radii[2]*math.sin(a)
+            cr.set_source_rgba(*hex_to_rgba(c["accent"], op * 0.6))
+            cr.set_dash([3, 6])
+            cr.move_to(x1, y1)
+            cr.line_to(x2, y2)
+            cr.stroke()
+            cr.set_dash([])
+
+    def _draw_ghost(self, cr, t, cx, cy, scale, c, op):
+        # Body
+        cr.set_source_rgba(*hex_to_rgba(c["ghost_fill"], op * 0.9))
+        first = True
+        for px, py in GHOST_POLYGON:
+            x, y = cx + px * scale, cy + py * scale
+            if first:
+                cr.move_to(x, y)
+                first = False
+            else:
+                cr.line_to(x, y)
+        cr.close_path()
+        cr.fill_preserve()
+        cr.set_source_rgba(*hex_to_rgba(c["ghost_outline"], op))
+        cr.set_line_width(2)
+        cr.stroke()
+
+        # Circuits
+        for i, path in enumerate(CIRCUIT_PATHS):
+            col = c["primary"] if i % 2 == 0 else c["secondary"]
+            cr.set_source_rgba(*hex_to_rgba(col, op))
+            cr.set_line_width(1.5)
+            for j in range(len(path) - 1):
+                cr.move_to(cx + path[j][0]*scale, cy + path[j][1]*scale)
+                cr.line_to(cx + path[j+1][0]*scale, cy + path[j+1][1]*scale)
+                cr.stroke()
+            for px, py in path:
+                cr.arc(cx + px*scale, cy + py*scale, 3, 0, 2*math.pi)
+                cr.fill()
+
+        # Core
+        r = scale * 0.18
+        angle = t * 2
+        cr.set_source_rgba(*hex_to_rgba(c["secondary"], op))
+        cr.set_line_width(2)
+        first = True
+        for i in range(8):
+            a = angle + i * math.pi/4
+            x, y = cx + r*math.cos(a), cy + r*math.sin(a)
+            if first:
+                cr.move_to(x, y)
+                first = False
+            else:
+                cr.line_to(x, y)
+        cr.close_path()
+        cr.fill_preserve()
+        cr.set_source_rgba(*hex_to_rgba(c["ghost_fill"], op))
+        cr.fill()
+
+        cr.set_source_rgba(*hex_to_rgba(c["primary"], op))
+        cr.arc(cx, cy, r*0.4, 0, 2*math.pi)
+        cr.fill()
+
+        # Eyes
+        eye_y = cy - scale * 0.28
+        spread = scale * 0.18
+        pulse = 1 + 0.15 * math.sin(t * 3)
+        for side in [-1, 1]:
+            ex = cx + side * spread
+            eye_r = 6 * pulse
+            cr.set_source_rgba(*hex_to_rgba(c["primary"], op))
+            first = True
+            for i in range(6):
+                a = i * math.pi/3 + t * 0.5
+                x, y = ex + eye_r*math.cos(a), eye_y + eye_r*math.sin(a)
+                if first:
+                    cr.move_to(x, y)
+                    first = False
+                else:
+                    cr.line_to(x, y)
+            cr.close_path()
+            cr.fill()
+
+        # Glow rings
+        for i in range(3):
+            gr = scale * 0.7 * (1 + i * 0.15)
+            cr.set_source_rgba(*hex_to_rgba(c["glow"], op * 0.15))
+            cr.arc(cx, cy, gr, 0, 2*math.pi)
+            cr.set_line_width(1)
+            cr.stroke()
+
+    def _draw_particles(self, cr, t, color, glow_color):
+        for p in self.particles:
+            twinkle = 0.5 + 0.5 * math.sin(t * 3 + p["phase"])
+            sz = p["size"] * twinkle
+            cr.set_source_rgba(*hex_to_rgba(color, twinkle))
+            cr.arc(p["x"], p["y"], sz, 0, 2*math.pi)
+            cr.fill()
+            cr.set_source_rgba(*hex_to_rgba(glow_color, twinkle * 0.3))
+            cr.arc(p["x"], p["y"], sz*2, 0, 2*math.pi)
+            cr.fill()
+
+    def _draw_hud(self, cr, t, cx, cy, scale, color):
+        spread = scale * 2.0
+        sz = scale * 0.15
+        corners = [
+            (cx-spread, cy-spread, 1, 1),
+            (cx+spread, cy-spread, -1, 1),
+            (cx-spread, cy+spread, 1, -1),
+            (cx+spread, cy+spread, -1, -1),
+        ]
+        cr.set_source_rgba(*hex_to_rgba(color, 0.5))
+        cr.set_line_width(1)
+        for x, y, dx, dy in corners:
+            cr.move_to(x, y+sz*dy)
+            cr.line_to(x, y)
+            cr.line_to(x+sz*dx, y)
+            cr.stroke()
+        scan_y = (t * 60) % self.sh
+        cr.move_to(0, scan_y)
+        cr.line_to(self.sw, scan_y)
+        cr.stroke()
+
+    def run(self):
+        from gi.repository import Gtk
+        Gtk.main()
+
+
+# ─── Factory ───────────────────────────────────────────────────────────
+
+def create_ghost_screen(cfg=None):
+    display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
+    if display_type == "wayland":
+        try:
+            return GtkGhostScreen(cfg)
+        except Exception:
+            print("Falling back to X11 mode (black background on Wayland).")
+    return TkinterGhostScreen(cfg)
 
 
 def main():
@@ -341,19 +633,7 @@ def main():
         kill_ghost()
         print("Ghost screen dismissed.")
     else:
-        if os.environ.get("XDG_SESSION_TYPE") == "wayland":
-            print(
-                "WARNING: You are on Wayland. Transparent overlays won't work.\n"
-                "         Log out, select 'Ubuntu on Xorg' at login, then try again.\n"
-            )
-        cfg = {}
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE) as f:
-                    cfg = json.load(f)
-            except Exception:
-                pass
-        app = GhostScreen(cfg)
+        app = create_ghost_screen()
         app.run()
 
 

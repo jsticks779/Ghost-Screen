@@ -70,7 +70,7 @@ ghost-screen --kill     # force stop
 ghost-screen --version  # show version
 ```
 
-Click anywhere on the overlay or press **Escape** to dismiss.
+The **only** way to dismiss the ghost is pressing your shortcut again (toggle off).
 
 ## Customization
 
@@ -130,7 +130,7 @@ Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if `unin
 desktop. A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is
 already displayed — running the script again kills the existing instance
 (toggle behavior). The ghost floats, rotates, pulses, and drifts particles at
-~30 FPS. Click, Escape, or the shortcut dismisses it.
+~30 FPS. Only the shortcut toggles it off — no click or Escape.
 
 ## License
 

@@ -142,24 +142,18 @@ class GhostScreen:
             })
 
     def _bind_events(self):
-        self.root.bind("<Button-1>", lambda e: self._close())
-        self.root.bind("<Escape>", lambda e: self._close())
-        self.root.bind("<Control-3>", lambda e: self._close())
-        self.root.protocol("WM_DELETE_WINDOW", self._close)
         signal.signal(signal.SIGTERM, lambda *_: os._exit(0))
 
     def _write_pid(self):
         with open(PID_FILE, "w") as f:
             f.write(str(os.getpid()))
 
-    def _close(self):
+    def _cleanup_pid(self):
         try:
             if os.path.exists(PID_FILE):
                 os.remove(PID_FILE)
         except OSError:
             pass
-        self.root.quit()
-        self.root.destroy()
 
     def draw(self):
         self.canvas.delete("all")

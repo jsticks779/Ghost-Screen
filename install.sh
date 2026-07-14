@@ -4,6 +4,7 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN="$HOME/.local/bin"
 APP="$HOME/.local/share/applications"
+AUTOSTART="$HOME/.config/autostart"
 SCRIPT="ghost_screen.py"
 NAME="ghost-screen"
 CMD="$BIN/$NAME"
@@ -14,18 +15,16 @@ echo "==> Installing Ghost Screen..."
 if ! python3 -c "import tkinter" 2>/dev/null; then
     echo "    python3-tk not found. Attempting to install..."
     if command -v apt-get &>/dev/null; then
-        sudo apt-get install -y python3-tk || echo "    sudo failed — install python3-tk manually: sudo apt-get install python3-tk"
+        sudo apt-get install -y python3-tk || echo "    Could not install python3-tk"
     elif command -v pacman &>/dev/null; then
-        sudo pacman -S --noconfirm tk || echo "    sudo failed — install tk manually: sudo pacman -S tk"
+        sudo pacman -S --noconfirm tk || echo "    Could not install tk"
     elif command -v dnf &>/dev/null; then
-        sudo dnf install -y python3-tkinter || echo "    sudo failed — install manually: sudo dnf install python3-tkinter"
-    else
-        echo "    Please install python3-tk manually for your distro."
+        sudo dnf install -y python3-tkinter || echo "    Could not install python3-tkinter"
     fi
 fi
 
 # ── Install files ─────────────────────────────────────────────────────
-mkdir -p "$BIN" "$APP"
+mkdir -p "$BIN" "$APP" "$AUTOSTART"
 cp "$DIR/$SCRIPT" "$CMD"
 chmod +x "$CMD"
 
@@ -40,60 +39,121 @@ Categories=Utility;
 EOF
 chmod +x "$APP/ghost-screen.desktop"
 
-# ── Wayland check ────────────────────────────────────────────────────
+# ── Wayland check ─────────────────────────────────────────────────────
 if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
     echo ""
     echo "  WARNING: You are on Wayland. Transparent overlays don't work here."
-    echo "  To fix: Log out → click gear icon → select 'Ubuntu on Xorg' → log in"
-    echo "  Then Ctrl+3 will work."
+    echo "  To fix: Log out -> click gear -> 'Ubuntu on Xorg' -> log in"
 fi
 
-# ── Auto-setup Ctrl+3 shortcut (GNOME) ───────────────────────────────
+# ── Try each desktop environment ──────────────────────────────────────
 SHORTCUT_OK=""
 
-if command -v gsettings &>/dev/null; then
-    RESULT=$(python3 -c "
+setup_xbindkeys() {
+    if ! command -v xbindkeys &>/dev/null; then
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y xbindkeys 2>/dev/null || return 1
+        elif command -v pacman &>/dev/null; then
+            sudo pacman -S --noconfirm xbindkeys 2>/dev/null || return 1
+        elif command -v dnf &>/dev/null; then
+            sudo dnf install -y xbindkeys 2>/dev/null || return 1
+        else
+            return 1
+        fi
+    fi
+
+    cat > "$HOME/.xbindkeysrc" << XEOF
+"$CMD"
+    Control+3
+XEOF
+
+    cat > "$AUTOSTART/xbindkeys.desktop" << XEOF
+[Desktop Entry]
+Type=Application
+Name=xbindkeys
+Comment=Global keyboard shortcuts (Ghost Screen)
+Exec=xbindkeys
+Terminal=false
+XEOF
+
+    xbindkeys 2>/dev/null || true
+    return 0
+}
+
+setup_gnome() {
+    command -v gsettings &>/dev/null || return 1
+    python3 -c "
 import subprocess as sp, ast
 schema = 'org.gnome.settings-daemon.plugins.media-keys'
-target_cmd = '$CMD'
+target = '$CMD'
 
-# Check if already registered
 cur = sp.run(['gsettings', 'get', schema, 'custom-keybindings'], capture_output=True, text=True).stdout.strip()
-if cur.startswith('['):
-    try:
-        existing = ast.literal_eval(cur)
-        for p in existing:
-            cmd = sp.run(['gsettings', 'get', f'{schema}.custom-keybinding:{p}', 'command'], capture_output=True, text=True).stdout.strip().strip(\"'\")
-            if cmd == target_cmd:
-                print('ALREADY_EXISTS')
-                exit(0)
-    except:
-        pass
+existing = ast.literal_eval(cur) if cur.startswith('[') else []
 
-# Find free slot
+# Remove duplicates, keep only first match
+found = False
+keep = []
+for p in existing:
+    cmd = sp.run(['gsettings', 'get', f'{schema}.custom-keybinding:{p}', 'command'], capture_output=True, text=True).stdout.strip().strip(\"'\")
+    if cmd == target:
+        if found:
+            sp.run(['gsettings', 'reset', f'{schema}.custom-keybinding:{p}', 'name'])
+            sp.run(['gsettings', 'reset', f'{schema}.custom-keybinding:{p}', 'command'])
+            sp.run(['gsettings', 'reset', f'{schema}.custom-keybinding:{p}', 'binding'])
+            continue
+        found = True
+    keep.append(p)
+
+if found:
+    sp.run(['gsettings', 'set', schema, 'custom-keybindings', str(keep)])
+    exit(0)
+
+# Register new
 for i in range(100):
     path = f'/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom{i}/'
     r = sp.run(['gsettings', 'get', f'{schema}.custom-keybinding:{path}', 'name'], capture_output=True, text=True)
-    n = r.stdout.strip()
-    if n in (\"''\", '@as []', '') or r.returncode != 0:
+    if r.stdout.strip() in (\"''\", '@as []', '') or r.returncode != 0:
         sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'name', 'Ghost Screen'])
-        sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'command', target_cmd])
+        sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'command', target])
         sp.run(['gsettings', 'set', f'{schema}.custom-keybinding:{path}', 'binding', '<Primary>3'])
-        cur = sp.run(['gsettings', 'get', schema, 'custom-keybindings'], capture_output=True, text=True).stdout.strip()
-        if cur in ('@as []', '[]'):
-            sp.run(['gsettings', 'set', schema, 'custom-keybindings', f\"['{path}']\"])
-        else:
-            sp.run(['gsettings', 'set', schema, 'custom-keybindings', cur[:-1] + f\", '{path}']\"])
-        print('OK')
+        keep.append(path)
+        sp.run(['gsettings', 'set', schema, 'custom-keybindings', str(keep)])
         exit(0)
-print('NO_SLOT')
-" 2>&1)
-    if [ "$RESULT" = "OK" ]; then
-        SHORTCUT_OK=1
-    elif [ "$RESULT" = "ALREADY_EXISTS" ]; then
-        SHORTCUT_OK=1
-        echo "    Ctrl+3 shortcut already registered (skipped duplicate)."
+exit(1)
+" && return 0 || return 1
+}
+
+setup_xfce() {
+    command -v xfconf-query &>/dev/null || return 1
+    xfconf-query -c xfce4-keyboard-shortcuts -n -t string -p "/commands/custom/<Primary>3" -s "$CMD" 2>/dev/null && return 0
+    # fallback: try older format
+    xfconf-query -c xfce4-keyboard-shortcuts -n -t string -p "/commands/custom/Control-3" -s "$CMD" 2>/dev/null && return 0
+    return 1
+}
+
+setup_kde() {
+    if command -v kwriteconfig5 &>/dev/null; then
+        kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group "Ghost Screen" --key "Ghost Screen" "_launch $CMD" 2>/dev/null
+        kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group "Ghost Screen" --key "Ghost Screen" "Ctrl+3" 2>/dev/null
+        qdbus org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.reloadConfig 2>/dev/null || true
+        return 0
     fi
+    return 1
+}
+
+# Try in order
+if setup_gnome; then
+    SHORTCUT_OK=1
+    echo "    Ctrl+3 shortcut set (GNOME)."
+elif setup_xfce; then
+    SHORTCUT_OK=1
+    echo "    Ctrl+3 shortcut set (XFCE)."
+elif setup_kde; then
+    SHORTCUT_OK=1
+    echo "    Ctrl+3 shortcut set (KDE Plasma)."
+elif setup_xbindkeys; then
+    SHORTCUT_OK=1
+    echo "    Ctrl+3 shortcut set (xbindkeys universal fallback)."
 fi
 
 # ── PATH check ────────────────────────────────────────────────────────
@@ -113,7 +173,9 @@ echo ""
 if [ -n "$SHORTCUT_OK" ]; then
     echo "  Press  Ctrl+3  to toggle the ghost on/off"
 else
-    echo "  Run: $NAME  (or set a keyboard shortcut in Settings)"
+    echo "  Could not auto-set shortcut for your desktop environment."
+    echo "  Set it manually: Settings -> Keyboard -> Shortcuts -> +"
+    echo "    Name: Ghost Screen,  Command: $CMD,  Shortcut: Ctrl+3"
 fi
 echo "  Kill: $NAME --kill"
 echo ""

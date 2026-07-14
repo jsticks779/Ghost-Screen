@@ -125,6 +125,7 @@ class GhostScreen:
         self.time = 0.0
         self.sw, self.sh = 0, 0
         self._backend = "x11"
+        self._quit = False
 
     def _init_particles(self):
         return [{
@@ -169,31 +170,64 @@ class GhostScreen:
 
 class TkinterGhostScreen(GhostScreen):
     def __init__(self, cfg=None):
-        import tkinter as tk
         super().__init__(cfg)
         self._backend = "x11"
+        self._root = None
+        self._canvas = None
+        signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
 
-        self.root = tk.Tk()
-        self.root.title(PROJECT)
-        self.root.attributes("-fullscreen", True)
-        self.root.attributes("-topmost", True)
-        self.root.attributes("-alpha", self.cfg["opacity"])
-        self.root.overrideredirect(True)
-        self.sw = self.root.winfo_screenwidth()
-        self.sh = self.root.winfo_screenheight()
+    def _signal_quit(self):
+        self._quit = True
+        if self._root is not None:
+            try:
+                self._root.quit()
+            except Exception:
+                pass
 
-        self.canvas = tk.Canvas(
-            self.root, width=self.sw, height=self.sh,
+    def _create_window(self):
+        import tkinter as tk
+        self._root = tk.Tk()
+        self._root.title(PROJECT)
+        self._root.attributes("-fullscreen", True)
+        self._root.attributes("-topmost", True)
+        self._root.attributes("-alpha", self.cfg["opacity"])
+        self._root.overrideredirect(True)
+        self.sw = self._root.winfo_screenwidth()
+        self.sh = self._root.winfo_screenheight()
+
+        self._canvas = tk.Canvas(
+            self._root, width=self.sw, height=self.sh,
             highlightthickness=0, bg=self.cfg["colors"]["bg"],
         )
-        self.canvas.pack()
+        self._canvas.pack()
 
-        self.particles = self._init_particles()
-        self._write_pid()
-        signal.signal(signal.SIGTERM, lambda *_: os._exit(0))
+        self._root.protocol("WM_DELETE_WINDOW", self._on_window_destroy)
+        self._root.bind("<Destroy>", self._on_window_destroy)
 
-    def draw(self):
-        self.canvas.delete("all")
+        if not hasattr(self, 'particles') or not self.particles:
+            self.particles = self._init_particles()
+            self._write_pid()
+
+        self._after_id = self._root.after(100, self._draw)
+
+    def _on_window_destroy(self, event=None):
+        if event is not None:
+            w = getattr(event, 'widget', None)
+            if w is not None and str(w) != '.':
+                return
+        self._root = None
+        self._canvas = None
+        self._after_id = None
+
+    def _draw(self):
+        if self._quit or self._root is None:
+            return
+
+        try:
+            self._canvas.delete("all")
+        except Exception:
+            return
+
         self._update()
         t = self.time
         c = self.cfg["colors"]
@@ -209,13 +243,18 @@ class TkinterGhostScreen(GhostScreen):
         self._draw_particles(t, c["particle"], c["primary"])
         self._draw_hud(t, cx, gy, scale, c["accent"])
 
-        self.root.after(self.cfg["frame_delay"], self.draw)
+        if self._quit or self._root is None:
+            return
+        try:
+            self._after_id = self._root.after(self.cfg["frame_delay"], self._draw)
+        except Exception:
+            pass
 
     def _draw_vignette(self):
         w, h = self.sw, self.sh
         for i in range(5):
             r = 1 - i * 0.15
-            self.canvas.create_rectangle(
+            self._canvas.create_rectangle(
                 w*(1-r)/2, h*(1-r)/2, w*(1+r)/2, h*(1+r)/2,
                 outline="", fill=f"#00000{i}",
             )
@@ -224,9 +263,9 @@ class TkinterGhostScreen(GhostScreen):
         spacing = 60
         off = (t * 8) % spacing
         for x in range(int(cx % spacing), self.sw, spacing):
-            self.canvas.create_line(x+off, 0, x+off, self.sh, fill=color, width=1)
+            self._canvas.create_line(x+off, 0, x+off, self.sh, fill=color, width=1)
         for y in range(int(cy % spacing), self.sh, spacing):
-            self.canvas.create_line(0, y+off, self.sw, y+off, fill=color, width=1)
+            self._canvas.create_line(0, y+off, self.sw, y+off, fill=color, width=1)
 
     def _draw_rings(self, t, cx, cy, scale, c):
         radii = [scale*1.8, scale*2.3, scale*2.8]
@@ -239,7 +278,7 @@ class TkinterGhostScreen(GhostScreen):
             for j in range(0, segs, gap):
                 a1 = angle + (j/segs) * 2 * math.pi
                 a2 = angle + ((j+gap-1)/segs) * 2 * math.pi
-                self.canvas.create_arc(
+                self._canvas.create_arc(
                     cx-r, cy-r, cx+r, cy+r,
                     start=math.degrees(a1),
                     extent=math.degrees(a2-a1),
@@ -251,7 +290,7 @@ class TkinterGhostScreen(GhostScreen):
             y1 = cy + radii[0]*math.sin(a)
             x2 = cx + radii[2]*math.cos(a)
             y2 = cy + radii[2]*math.sin(a)
-            self.canvas.create_line(
+            self._canvas.create_line(
                 x1, y1, x2, y2,
                 fill=c["accent"], width=1, dash=(3, 6),
             )
@@ -261,20 +300,20 @@ class TkinterGhostScreen(GhostScreen):
         for px, py in GHOST_POLYGON:
             pts.append(cx + px * scale)
             pts.append(cy + py * scale)
-        self.canvas.create_polygon(
+        self._canvas.create_polygon(
             pts, fill=c["ghost_fill"], outline=c["ghost_outline"], width=2,
         )
 
         for i, path in enumerate(CIRCUIT_PATHS):
             col = c["primary"] if i % 2 == 0 else c["secondary"]
             for j in range(len(path) - 1):
-                self.canvas.create_line(
+                self._canvas.create_line(
                     cx + path[j][0]*scale, cy + path[j][1]*scale,
                     cx + path[j+1][0]*scale, cy + path[j+1][1]*scale,
                     fill=col, width=1.5,
                 )
             for px, py in path:
-                self.canvas.create_oval(
+                self._canvas.create_oval(
                     cx + px*scale - 3, cy + py*scale - 3,
                     cx + px*scale + 3, cy + py*scale + 3,
                     fill=col, outline="",
@@ -286,10 +325,10 @@ class TkinterGhostScreen(GhostScreen):
         for i in range(8):
             a = angle + i * math.pi/4
             pts.extend([cx + r*math.cos(a), cy + r*math.sin(a)])
-        self.canvas.create_polygon(
+        self._canvas.create_polygon(
             pts, outline=c["secondary"], fill=c["ghost_fill"], width=2,
         )
-        self.canvas.create_oval(
+        self._canvas.create_oval(
             cx - r*0.4, cy - r*0.4, cx + r*0.4, cy + r*0.4,
             fill=c["primary"], outline="",
         )
@@ -304,11 +343,11 @@ class TkinterGhostScreen(GhostScreen):
             for i in range(6):
                 a = i * math.pi/3 + t * 0.5
                 pts.extend([ex + eye_r*math.cos(a), eye_y + eye_r*math.sin(a)])
-            self.canvas.create_polygon(pts, fill=c["primary"], outline="")
+            self._canvas.create_polygon(pts, fill=c["primary"], outline="")
 
         for i in range(3):
             gr = scale * 0.7 * (1 + i * 0.15)
-            self.canvas.create_oval(
+            self._canvas.create_oval(
                 cx - gr, cy - gr, cx + gr, cy + gr,
                 outline=c["glow"], width=1,
             )
@@ -317,11 +356,11 @@ class TkinterGhostScreen(GhostScreen):
         for p in self.particles:
             twinkle = 0.5 + 0.5 * math.sin(t * 3 + p["phase"])
             sz = p["size"] * twinkle
-            self.canvas.create_oval(
+            self._canvas.create_oval(
                 p["x"] - sz, p["y"] - sz, p["x"] + sz, p["y"] + sz,
                 fill=color, outline="",
             )
-            self.canvas.create_oval(
+            self._canvas.create_oval(
                 p["x"] - sz*0.5, p["y"] - sz*0.5,
                 p["x"] + sz*0.5, p["y"] + sz*0.5,
                 fill=glow_color, outline="",
@@ -337,14 +376,23 @@ class TkinterGhostScreen(GhostScreen):
             (cx+spread, cy+spread, -1, -1),
         ]
         for x, y, dx, dy in corners:
-            self.canvas.create_line(x, y+sz*dy, x, y, fill=color, width=1)
-            self.canvas.create_line(x, y, x+sz*dx, y, fill=color, width=1)
+            self._canvas.create_line(x, y+sz*dy, x, y, fill=color, width=1)
+            self._canvas.create_line(x, y, x+sz*dx, y, fill=color, width=1)
         scan_y = (t * 60) % self.sh
-        self.canvas.create_line(0, scan_y, self.sw, scan_y, fill=color, width=1)
+        self._canvas.create_line(0, scan_y, self.sw, scan_y, fill=color, width=1)
 
     def run(self):
-        self.root.after(100, self.draw)
-        self.root.mainloop()
+        self._create_window()
+        while not self._quit:
+            try:
+                self._root.mainloop()
+            except Exception:
+                pass
+            if self._quit:
+                break
+            if self._root is None:
+                self._create_window()
+        self._cleanup_pid()
 
 
 # ─── GTK3 backend (Wayland + X11, uses Pillow + GdkPixbuf) ─────────────
@@ -376,13 +424,25 @@ class GtkGhostScreen(GhostScreen):
     def __init__(self, cfg=None):
         super().__init__(cfg)
         self._backend = "wayland"
-        self._setup_gtk()
+        self._window = None
+        self._image = None
+        self._GdkPixbuf = None
+        self._GLib = None
+        signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
+        self._init_once()
+        self._create_window()
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import GLib
+        GLib.timeout_add(self.cfg["frame_delay"], self._tick)
 
-    def _setup_gtk(self):
+    def _init_once(self):
         import gi
         gi.require_version("Gdk", "3.0")
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gdk, Gtk, GLib, GdkPixbuf
+        self._GdkPixbuf = GdkPixbuf
+        self._GLib = GLib
 
         display = Gdk.Display.get_default()
         if display:
@@ -392,47 +452,56 @@ class GtkGhostScreen(GhostScreen):
                 geo = mon.get_geometry()
                 self.sw, self.sh = geo.width, geo.height
         if not self.sw:
-            self.sw, self.sh = 1920, 1080  # fallback
-
-        self.win = Gtk.Window()
-        self.win.set_title(PROJECT)
-        self.win.set_app_paintable(True)
-        self.win.set_keep_above(True)
-        self.win.fullscreen()
-
-        screen = self.win.get_screen()
-        visual = screen.get_rgba_visual()
-        if visual:
-            self.win.set_visual(visual)
-
-        self.image = Gtk.Image()
-        self.win.add(self.image)
-        self.win.show_all()
-
-        self.win.connect("destroy", lambda *_: Gtk.main_quit())
+            self.sw, self.sh = 1920, 1080
 
         self.particles = self._init_particles()
         self._write_pid()
 
-        self._gtk_quit = False
-        self._GdkPixbuf = GdkPixbuf
-        self._GLib = GLib
-        signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
+    def _create_window(self):
+        import gi
+        gi.require_version("Gdk", "3.0")
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gdk, Gtk
 
-        GLib.timeout_add(self.cfg["frame_delay"], self._tick)
+        self._window = Gtk.Window()
+        self._window.set_title(PROJECT)
+        self._window.set_app_paintable(True)
+        self._window.set_keep_above(True)
+        self._window.fullscreen()
+
+        screen = self._window.get_screen()
+        visual = screen.get_rgba_visual()
+        if visual:
+            self._window.set_visual(visual)
+
+        self._image = Gtk.Image()
+        self._window.add(self._image)
+        self._window.show_all()
+
+        self._window.connect("destroy", self._on_window_destroy)
+
+    def _on_window_destroy(self, *args):
+        self._window = None
+        self._image = None
 
     def _signal_quit(self):
-        self._gtk_quit = True
+        self._quit = True
 
     def _tick(self):
-        if self._gtk_quit:
+        if self._quit:
             self._cleanup_pid()
-            self._gtk_quit = False
             import gi
             gi.require_version("Gtk", "3.0")
             from gi.repository import Gtk
             Gtk.main_quit()
             return False
+
+        if self._window is None:
+            try:
+                self._create_window()
+            except Exception:
+                pass
+            return True
 
         self._update()
         t = self.time
@@ -458,7 +527,7 @@ class GtkGhostScreen(GhostScreen):
             self._GdkPixbuf.Colorspace.RGB, True, 8,
             self.sw, self.sh, self.sw * 4,
         )
-        self.image.set_from_pixbuf(pb)
+        self._image.set_from_pixbuf(pb)
 
         return True
 

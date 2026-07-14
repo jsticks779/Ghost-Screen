@@ -14,23 +14,30 @@ keyboard shortcut for a cyberpunk holographic screensaver effect.
 
 ## Requirements
 
-- Linux with X11 (default on most distros)
-- Python 3 with **tkinter** (usually pre-installed; try `python3 -m tkinter`)
-- `~/.local/bin` in your `PATH` (add it: `export PATH="$HOME/.local/bin:$PATH"`)
+- **Linux** with X11 (default on most distros — Wayland has limited transparency)
+- **Python 3** — tkinter is auto-installed if missing
 
-> **Wayland note**: transparency effects are limited on Wayland. Log out and
-> select the "Ubuntu on Xorg" session if things don't render correctly.
+> **Wayland note**: log out and select "Ubuntu on Xorg" at login if transparency
+> doesn't render correctly.
 
-## Installation
+## Installation (one command — fully automatic)
 
 ```bash
 git clone https://github.com/jsticks779/Ghost-Screen.git
 cd Ghost-Screen
-chmod +x install.sh
 ./install.sh
 ```
 
-Or install manually:
+What `install.sh` does automatically:
+- Installs `python3-tk` if missing
+- Copies `ghost_screen.py` to `~/.local/bin/ghost-screen`
+- Creates a desktop entry (shows in app menu)
+- **Registers Ctrl+3 as a system-wide shortcut** (GNOME)
+- Adds `~/.local/bin` to your `PATH` in `~/.bashrc`
+
+After running it, **Ctrl+3** works immediately — no Settings menu needed.
+
+### Manual installation (if you prefer)
 
 ```bash
 mkdir -p ~/.local/bin ~/.local/share/applications
@@ -38,23 +45,22 @@ cp ghost_screen.py ~/.local/bin/ghost-screen
 chmod +x ~/.local/bin/ghost-screen
 ```
 
-## Setting Up a Keyboard Shortcut
+Then set a keyboard shortcut in your DE's settings (see below).
 
-### GNOME (Ubuntu default)
+## Keyboard Shortcut
 
-The `install.sh` script tries to register **Ctrl+3** automatically. If it fails,
-or you want a different key:
+### Ctrl+3 is set automatically on GNOME (Ubuntu default)
 
-1. **Settings → Keyboard → Keyboard Shortcuts**
-2. Scroll to the bottom → click **+**
-3. **Name**: `Ghost Screen` • **Command**: `~/.local/bin/ghost-screen`
-4. **Set Shortcut** → press your preferred key combination
+The install script registers it via `gsettings`. It persists across reboots.
 
-### KDE
+### Manual setup (for other desktop environments)
 
-**System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL**
-
-Set trigger to your key combination and action to `~/.local/bin/ghost-screen`.
+| DE | Steps |
+|----|-------|
+| **KDE** | System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL → set to `~/.local/bin/ghost-screen` |
+| **XFCE** | Settings → Keyboard → Application Shortcuts → Add → `~/.local/bin/ghost-screen` |
+| **i3/Sway** | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
+| **Any** | Use your DE's "Custom Shortcut" feature with command `~/.local/bin/ghost-screen` |
 
 ## Usage
 
@@ -103,11 +109,12 @@ Create a `ghost_screen.json` file next to the script:
 
 ```bash
 cd Ghost-Screen
-chmod +x uninstall.sh
 ./uninstall.sh
 ```
 
-Or manually:
+This removes the binary, desktop entry, and **also cleans up the Ctrl+3 shortcut**.
+
+Or do it manually:
 
 ```bash
 ghost-screen --kill
@@ -115,7 +122,7 @@ rm -f ~/.local/bin/ghost-screen
 rm -f ~/.local/share/applications/ghost-screen.desktop
 ```
 
-Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if you set one.
+Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if `uninstall.sh` didn't catch it.
 
 ## How It Works
 

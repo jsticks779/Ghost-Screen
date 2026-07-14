@@ -359,10 +359,10 @@ class GtkGhostScreen(GhostScreen):
         import gi
         gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        from gi.repository import Gtk, Gdk, GLib
-        import cairo
-        self._OP_SOURCE = cairo.OPERATOR_SOURCE
-        self._OP_OVER = cairo.OPERATOR_OVER
+        gi.require_version("cairo", "1.0")
+        from gi.repository import Gtk, Gdk, GLib, cairo
+        self._OP_SOURCE = cairo.Operator.SOURCE
+        self._OP_OVER = cairo.Operator.OVER
 
         display = Gdk.Display.get_default()
         if display:

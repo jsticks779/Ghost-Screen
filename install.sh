@@ -13,14 +13,14 @@ echo "==> Installing Ghost Screen..."
 
 # ── Dependencies ──────────────────────────────────────────────────────
 if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
-    if ! python3 -c "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; import cairo" 2>/dev/null; then
+    if ! python3 -c "import gi; gi.require_version('Gtk','3.0'); gi.require_version('cairo','1.0'); from gi.repository import Gtk, cairo" 2>/dev/null; then
         echo "    GTK3 not found (required for Wayland). Installing..."
         if command -v apt-get &>/dev/null; then
-            sudo apt-get install -y python3-gi gir1.2-gtk-3.0 python3-cairo || echo "    Could not install GTK3"
+            sudo apt-get install -y python3-gi gir1.2-gtk-3.0 || echo "    Could not install GTK3"
         elif command -v pacman &>/dev/null; then
-            sudo pacman -S --noconfirm python-gobject gtk3 python-cairo || echo "    Could not install GTK3"
+            sudo pacman -S --noconfirm python-gobject gtk3 || echo "    Could not install GTK3"
         elif command -v dnf &>/dev/null; then
-            sudo dnf install -y python3-gobject gtk3 python3-cairo || echo "    Could not install GTK3"
+            sudo dnf install -y python3-gobject gtk3 || echo "    Could not install GTK3"
         fi
     fi
 else

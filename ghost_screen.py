@@ -9,6 +9,7 @@ import argparse
 import json
 import subprocess
 import shutil
+import atexit
 
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
@@ -434,6 +435,56 @@ def _restore_gnome_shortcuts():
     cmds.append('Main.overview.animationDuration = 250;')
     for c in cmds:
         _gnome_eval(c)
+
+
+_GSETTINGS_SAVED = {}
+
+def _gsettings_save(schema, key):
+    try:
+        r = subprocess.run(["gsettings", "get", schema, key],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            _GSETTINGS_SAVED[(schema, key)] = r.stdout.strip()
+            return True
+    except Exception:
+        pass
+    return False
+
+def _gsettings_restore_all():
+    for (schema, key), val in _GSETTINGS_SAVED.items():
+        try:
+            subprocess.run(["gsettings", "set", schema, key, val],
+                           capture_output=True, timeout=5)
+        except Exception:
+            pass
+    _GSETTINGS_SAVED.clear()
+
+def _inhibit_gesture_triggers():
+    """Disable gsettings keybindings that touchpad gestures trigger."""
+    de = os.environ.get("XDG_SESSION_TYPE") == "wayland" and detect_de() == "gnome"
+    if not de:
+        return False
+    pairs = [
+        ("org.gnome.shell.keybindings", "toggle-overview"),
+        ("org.gnome.shell.keybindings", "toggle-application-view"),
+        ("org.gnome.desktop.wm.keybindings", "switch-to-workspace-left"),
+        ("org.gnome.desktop.wm.keybindings", "switch-to-workspace-right"),
+        ("org.gnome.desktop.wm.keybindings", "switch-applications"),
+        ("org.gnome.desktop.wm.keybindings", "switch-windows"),
+        ("org.gnome.desktop.wm.keybindings", "switch-group"),
+        ("org.gnome.shell.keybindings", "focus-active-notification"),
+        ("org.gnome.desktop.wm.keybindings", "show-desktop"),
+    ]
+    saved_any = False
+    for schema, key in pairs:
+        if _gsettings_save(schema, key):
+            subprocess.run(["gsettings", "set", schema, key, "@as []"],
+                           capture_output=True, timeout=5)
+            saved_any = True
+    return saved_any
+
+def _restore_gesture_triggers():
+    _gsettings_restore_all()
 
 
 class WaylandShortcutBlocker:
@@ -872,6 +923,10 @@ class GtkGhostScreen(GhostScreen):
         self._GLib = None
         self._shortcut_blocker = None
         self._gnome_restore = False
+        self._gesture_saved = False
+        self._toggle_mods = 0
+        self._toggle_keyval = 0
+        self._init_toggle_key()
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
         self._init_once()
         self._create_window()
@@ -879,6 +934,25 @@ class GtkGhostScreen(GhostScreen):
         gi.require_version("Gtk", "3.0")
         from gi.repository import GLib
         GLib.timeout_add(self.cfg["frame_delay"], self._tick)
+
+    def _init_toggle_key(self):
+        import gi
+        gi.require_version("Gdk", "3.0")
+        from gi.repository import Gdk
+        combo = _get_toggle_combo()
+        mods, key = parse_shortcut(combo)
+        mod_map = {"Ctrl": Gdk.ModifierType.CONTROL_MASK,
+                   "Control": Gdk.ModifierType.CONTROL_MASK,
+                   "Alt": Gdk.ModifierType.MOD1_MASK,
+                   "Shift": Gdk.ModifierType.SHIFT_MASK,
+                   "Super": Gdk.ModifierType.SUPER_MASK}
+        mask = 0
+        for m in mods:
+            gdk_mod = mod_map.get(m)
+            if gdk_mod:
+                mask |= gdk_mod
+        self._toggle_mods = mask
+        self._toggle_keyval = Gdk.keyval_from_name(key)
 
     def _init_once(self):
         import gi
@@ -939,7 +1013,11 @@ class GtkGhostScreen(GhostScreen):
         except Exception:
             pass
 
-        # 2. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
+        # 2. Disable gsettings keybindings triggered by touch gestures
+        if _inhibit_gesture_triggers():
+            self._gesture_saved = True
+
+        # 3. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
         if not self._shortcut_blocker:
             if _inhibit_gnome_shortcuts():
                 self._gnome_restore = True
@@ -967,7 +1045,21 @@ class GtkGhostScreen(GhostScreen):
             self._grab_active = False
 
     def _on_consume(self, widget, event):
+        import gi
+        gi.require_version("Gdk", "3.0")
+        from gi.repository import Gdk
+        if event.type == Gdk.EventType.KEY_PRESS:
+            if event.keyval == self._toggle_keyval:
+                state = event.state & Gdk.ModifierType.MODIFIER_MASK
+                if state == self._toggle_mods:
+                    self._toggle_off()
+                    return True
         return True
+
+    def _toggle_off(self):
+        self._cleanup_inhibition()
+        self._cleanup_pid()
+        self._quit = True
 
     def _on_window_destroy(self, *args):
         self._cleanup_inhibition()
@@ -979,6 +1071,9 @@ class GtkGhostScreen(GhostScreen):
         self._quit = True
 
     def _cleanup_inhibition(self):
+        if self._gesture_saved:
+            _restore_gesture_triggers()
+            self._gesture_saved = False
         if self._gnome_restore:
             _restore_gnome_shortcuts()
             self._gnome_restore = False
@@ -1256,6 +1351,7 @@ def main():
         kill_ghost()
         print("Ghost screen dismissed.")
     else:
+        atexit.register(_restore_gesture_triggers)
         if args.no_sleep:
             print("  Prevent sleep enabled — system will not suspend\n"
                   "  while Ghost Screen is active. Toggle off to allow sleep.")

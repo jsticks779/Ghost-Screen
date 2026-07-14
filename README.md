@@ -32,7 +32,11 @@ What `install.sh` does automatically:
 - Installs `python3-tk` if missing
 - Copies `ghost_screen.py` to `~/.local/bin/ghost-screen`
 - Creates a desktop entry (shows in app menu)
-- **Registers Ctrl+3 as a system-wide shortcut** (GNOME)
+- **Detects your desktop environment and registers Ctrl+3:**
+  - **GNOME** (Ubuntu, Budgie, Cinnamon, MATE) → uses `gsettings`
+  - **XFCE** → uses `xfconf-query`
+  - **KDE Plasma** → uses `kwriteconfig5`
+  - **Any other** → installs `xbindkeys` as universal fallback
 - Adds `~/.local/bin` to your `PATH` in `~/.bashrc`
 
 After running it, **Ctrl+3** works immediately — no Settings menu needed.
@@ -49,18 +53,22 @@ Then set a keyboard shortcut in your DE's settings (see below).
 
 ## Keyboard Shortcut
 
-### Ctrl+3 is set automatically on GNOME (Ubuntu default)
+### Ctrl+3 is set automatically — any desktop
 
-The install script registers it via `gsettings`. It persists across reboots.
+The install script detects your environment (GNOME, XFCE, KDE, or others via
+xbindkeys) and registers **Ctrl+3** without you lifting a finger.
 
-### Manual setup (for other desktop environments)
+It persists across reboots.
+
+### Manual setup (if needed)
 
 | DE | Steps |
 |----|-------|
+| **GNOME** | Settings → Keyboard → Shortcuts → + → Name: `Ghost Screen` → Command: `~/.local/bin/ghost-screen` → Set Shortcut: Ctrl+3 |
 | **KDE** | System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL → set to `~/.local/bin/ghost-screen` |
 | **XFCE** | Settings → Keyboard → Application Shortcuts → Add → `~/.local/bin/ghost-screen` |
 | **i3/Sway** | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
-| **Any** | Use your DE's "Custom Shortcut" feature with command `~/.local/bin/ghost-screen` |
+| **Any** | Use your DE's custom shortcut feature with command `~/.local/bin/ghost-screen` |
 
 ## Usage
 

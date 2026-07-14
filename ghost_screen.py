@@ -118,7 +118,7 @@ def merge_config(cfg):
 # ─── Shared base class ─────────────────────────────────────────────────
 
 class GhostScreen:
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, no_sleep=False):
         raw = load_config()
         raw.update(cfg or {})
         self.cfg = merge_config(raw)
@@ -126,6 +126,9 @@ class GhostScreen:
         self.sw, self.sh = 0, 0
         self._backend = "x11"
         self._quit = False
+        self._inhibitor = None
+        if no_sleep:
+            self._acquire_inhibitor()
 
     def _init_particles(self):
         return [{
@@ -161,6 +164,32 @@ class GhostScreen:
                 os.remove(PID_FILE)
         except OSError:
             pass
+        self._release_inhibitor()
+
+    def _acquire_inhibitor(self):
+        import subprocess
+        try:
+            self._inhibitor = subprocess.Popen(
+                ["systemd-inhibit", "--what=sleep", "--who=Ghost Screen",
+                 "--why=Ghost overlay is active", "--mode=block", "cat"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            self._inhibitor = None
+
+    def _release_inhibitor(self):
+        if self._inhibitor is not None:
+            try:
+                self._inhibitor.stdin.close()
+                self._inhibitor.wait(timeout=2)
+            except Exception:
+                try:
+                    self._inhibitor.kill()
+                except Exception:
+                    pass
+            self._inhibitor = None
 
     def run(self):
         raise NotImplementedError
@@ -169,8 +198,8 @@ class GhostScreen:
 # ─── Tkinter backend (X11) ────────────────────────────────────────────
 
 class TkinterGhostScreen(GhostScreen):
-    def __init__(self, cfg=None):
-        super().__init__(cfg)
+    def __init__(self, cfg=None, no_sleep=False):
+        super().__init__(cfg, no_sleep=no_sleep)
         self._backend = "x11"
         self._root = None
         self._canvas = None
@@ -421,8 +450,8 @@ def _draw_dashed_line(draw, x1, y1, x2, y2, color, width=1, dash=3, gap=6):
 
 
 class GtkGhostScreen(GhostScreen):
-    def __init__(self, cfg=None):
-        super().__init__(cfg)
+    def __init__(self, cfg=None, no_sleep=False):
+        super().__init__(cfg, no_sleep=no_sleep)
         self._backend = "wayland"
         self._window = None
         self._image = None
@@ -675,17 +704,17 @@ class GtkGhostScreen(GhostScreen):
 
 # ─── Factory ───────────────────────────────────────────────────────────
 
-def create_ghost_screen(cfg=None):
+def create_ghost_screen(cfg=None, no_sleep=False):
     display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
     if display_type == "wayland":
         try:
             from PIL import Image, ImageDraw
-            return GtkGhostScreen(cfg)
+            return GtkGhostScreen(cfg, no_sleep=no_sleep)
         except ImportError:
             print("Pillow not installed; install python3-pil for Wayland transparency.")
         except Exception as e:
             print(f"Wayland backend failed ({e}), falling back to X11.")
-    return TkinterGhostScreen(cfg)
+    return TkinterGhostScreen(cfg, no_sleep=no_sleep)
 
 
 def check_deps():
@@ -731,6 +760,8 @@ def main():
     parser.add_argument("--kill", "-k", action="store_true", help="Kill running instance")
     parser.add_argument("--version", "-v", action="store_true", help="Show version")
     parser.add_argument("--check", "-c", action="store_true", help="Check dependencies")
+    parser.add_argument("--no-sleep", "-n", action="store_true",
+                        help="Prevent PC sleep while ghost is active")
     args = parser.parse_args()
 
     if args.version:
@@ -748,8 +779,11 @@ def main():
         kill_ghost()
         print("Ghost screen dismissed.")
     else:
+        if args.no_sleep:
+            print("  Prevent sleep enabled — system will not suspend\n"
+                  "  while Ghost Screen is active. Toggle off to allow sleep.")
         try:
-            app = create_ghost_screen()
+            app = create_ghost_screen(no_sleep=args.no_sleep)
             app.run()
         except KeyboardInterrupt:
             print()

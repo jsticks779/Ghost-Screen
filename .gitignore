@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 *.pyo
 ghost_screen.json
+*.so
+wl_ksh_code.c
+zwp_ksh_client.h

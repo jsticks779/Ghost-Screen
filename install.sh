@@ -175,6 +175,23 @@ mkdir -p "$BIN" "$APP" "$AUTOSTART"
 cp "$DIR/$SCRIPT" "$CMD"
 chmod +x "$CMD"
 
+# Build and install Wayland shortcut inhibitor (C shared library)
+if command -v gcc &>/dev/null && command -v wayland-scanner &>/dev/null; then
+    echo "    Building Wayland shortcut inhibitor..."
+    if [ -f "$DIR/wl_ksh_code.c" ] && [ -f "$DIR/wl_inhibit.c" ]; then
+        gcc -shared -fPIC -o "$DIR/wl_inhibit.so" \
+            "$DIR/wl_inhibit.c" "$DIR/wl_ksh_code.c" \
+            $(pkg-config --cflags --libs gtk+-3.0 wayland-client 2>/dev/null) 2>/dev/null && \
+        echo "    wl_inhibit.so built OK" || \
+        echo "    wl_inhibit.so build failed (non-fatal)"
+    fi
+fi
+
+if [ -f "$DIR/wl_inhibit.so" ]; then
+    cp "$DIR/wl_inhibit.so" "$BIN/wl_inhibit.so"
+    chmod +x "$BIN/wl_inhibit.so"
+fi
+
 cat > "$APP/ghost-screen.desktop" << EOF
 [Desktop Entry]
 Name=Ghost Screen

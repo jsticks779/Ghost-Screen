@@ -437,244 +437,43 @@ def _restore_gnome_shortcuts():
 
 
 class WaylandShortcutBlocker:
-    """Blocks compositor keyboard shortcuts on Wayland using
-       zwp_keyboard_shortcuts_inhibit_manager_v1 protocol."""
+    _lib = None
 
-    def __init__(self, wl_surface_ptr):
-        self._inhibitor = None
-        self._active = False
-        self._libwl = None
-        self._setup(wl_surface_ptr)
+    @classmethod
+    def _ensure_lib(cls):
+        if cls._lib is not None:
+            return cls._lib
+        import ctypes, os
+        d = os.path.dirname(os.path.abspath(__file__))
+        lib_path = os.path.join(d, "wl_inhibit.so")
+        if os.path.exists(lib_path):
+            cls._lib = ctypes.CDLL(lib_path)
+            cls._lib.ghost_inhibit_start.restype = ctypes.c_void_p
+            cls._lib.ghost_inhibit_start.argtypes = []
+            cls._lib.ghost_inhibit_stop.argtypes = [ctypes.c_void_p]
+            cls._lib.ghost_inhibit_is_active.argtypes = [ctypes.c_void_p]
+            cls._lib.ghost_inhibit_is_active.restype = ctypes.c_int
+            return cls._lib
+        return None
 
-    def _setup(self, surf_ptr):
-        import ctypes
-        try:
-            libwl = ctypes.CDLL("libwayland-client.so.0")
-            libgdk = ctypes.CDLL("libgdk-3.so.0")
-
-            from gi.repository import Gdk
-            disp = Gdk.Display.get_default()
-            if not disp:
-                return
-
-            gdk_get_wl = libgdk.gdk_wayland_display_get_wl_display
-            gdk_get_wl.argtypes = [ctypes.c_void_p]
-            gdk_get_wl.restype = ctypes.c_void_p
-            wl_disp = gdk_get_wl(ctypes.c_void_p(hash(disp)))
-            if not wl_disp:
-                return
-
-            self._libwl = libwl
-
-            reg = libwl.wl_display_get_registry(wl_disp)
-            if not reg:
-                return
-
-            wl_proxy_marshal = libwl.wl_proxy_marshal
-            wl_proxy_marshal.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-            wl_proxy_marshal.restype = None
-
-            wl_proxy_marshal_con = libwl.wl_proxy_marshal_constructor
-            wl_proxy_marshal_con.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
-                                              ctypes.c_void_p]
-            wl_proxy_marshal_con.restype = ctypes.c_void_p
-
-            wl_proxy_add_listener = libwl.wl_proxy_add_listener
-            wl_proxy_add_listener.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
-                                               ctypes.c_void_p]
-            wl_proxy_add_listener.restype = ctypes.c_int
-
-            wl_display_roundtrip = libwl.wl_display_roundtrip
-            wl_display_roundtrip.argtypes = [ctypes.c_void_p]
-            wl_display_roundtrip.restype = ctypes.c_int
-
-            # Find zwp_keyboard_shortcuts_inhibit_manager_v1 in registry
-            # We need a global listener callback
-            found = ctypes.c_int(0)
-            manager_ptr = ctypes.c_void_p()
-
-            GLOBAL_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p,
-                                           ctypes.c_uint32, ctypes.c_char_p,
-                                           ctypes.c_uint32)
-
-            def on_global(data, registry, name, interface, version):
-                if interface == b"zwp_keyboard_shortcuts_inhibit_manager_v1":
-                    found.value = 1
-                    # Bind to it
-                    # Need wl_interface for it
-                    # First try to find it in the protocol
-
-            # Actually, the wl_interface must be declared properly.
-            # Let's use a different approach: build the wl_interface
-            # struct on the fly.
-
-            # wl_interface struct:
-            #   name: char*
-            #   version: int
-            #   method_count: int
-            #   methods: wl_message*
-            #   event_count: int
-            #   events: wl_message*
-
-            # For zwp_keyboard_shortcuts_inhibit_manager_v1 (version 1):
-            #   methods: 2 (destroy=0, create_inhibitor=1)
-            #   events: 0
-
-            # wl_message struct:
-            #   name: char*
-            #   signature: char*
-            #   types: wl_interface**
-
-            # Create interface struct
-            class WLMessage(ctypes.Structure):
-                _fields_ = [("name", ctypes.c_char_p),
-                            ("signature", ctypes.c_char_p),
-                            ("types", ctypes.c_void_p)]
-
-            class WLInterface(ctypes.Structure):
-                _fields_ = [("name", ctypes.c_char_p),
-                            ("version", ctypes.c_int),
-                            ("method_count", ctypes.c_int),
-                            ("methods", ctypes.POINTER(WLMessage)),
-                            ("event_count", ctypes.c_int),
-                            ("events", ctypes.c_void_p)]
-
-            # Build messages for zwp_keyboard_shortcuts_inhibit_manager_v1
-            # destroy: signature ""
-            # create_inhibitor: signature "nso" (new_id, string?, object)
-            msgs = (WLMessage * 2)()
-            msgs[0] = WLMessage(b"destroy", b"", None)
-            msgs[1] = WLMessage(b"create_inhibitor", b"nso", None)
-
-            mgr_iface = WLInterface(
-                b"zwp_keyboard_shortcuts_inhibit_manager_v1",
-                1, 2, msgs, 0, None
-            )
-
-            # Bind to it
-            wl_registry_bind = libwl.wl_registry_bind
-            wl_registry_bind.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
-                                           ctypes.POINTER(WLInterface), ctypes.c_uint32]
-            wl_registry_bind.restype = ctypes.c_void_p
-
-            # We already have name from the global event, but we need to
-            # capture it. Simplified approach: directly bind since we know
-            # the protocol name.
-
-            # Actually, we can search for it. But for now, let's use
-            # a simpler approach: call the registry bind function with
-            # a fixed name.
-
-            # Hmm, we need the registry name (uint32). We can get it from
-            # the global event. But we haven't set up the listener yet.
-
-            # Let's take a different approach: set up the listener, roundtrip
-            # to find the name, then bind.
-
-            REG_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p,
-                                       ctypes.c_uint32, ctypes.c_char_p,
-                                       ctypes.c_uint32)
-            REG_REMOVE_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p,
-                                              ctypes.c_void_p, ctypes.c_uint32)
-
-            # wl_registry_listener struct: use array of function pointers
-            reg_name = ctypes.c_uint32(0)
-
-            def on_reg_global(data, reg, name, iface, ver):
-                if iface == b"zwp_keyboard_shortcuts_inhibit_manager_v1":
-                    reg_name.value = name
-
-            reg_global_cb = REG_CB(on_reg_global)
-            reg_remove_cb = REG_REMOVE_CB(lambda d, r, n: None)
-
-            class RegistryListener(ctypes.Structure):
-                _fields_ = [("global", REG_CB), ("global_remove", REG_REMOVE_CB)]
-
-            rl = RegistryListener(reg_global_cb, reg_remove_cb)
-            wl_proxy_add_listener(reg, ctypes.byref(rl), None)
-
-            wl_display_roundtrip(wl_disp)
-            wl_display_roundtrip(wl_disp)
-
-            if not reg_name.value:
-                return
-
-            # Now bind
-            mgr_ptr = wl_registry_bind(reg, reg_name.value, mgr_iface, 1)
-            if not mgr_ptr:
-                return
-
-            # Create inhibitor on the surface
-            # get wl_surface from GdkWindow pointer
-            # Actually, the caller passes wl_surface_ptr
-
-            # For wl_proxy_marshal_constructor with the inhibitor:
-            # opcode 1 = create_inhibitor, takes (new_id, object)
-            # We need the zwp_keyboard_shortcuts_inhibitor_v1 interface
-
-            # Create inhibitor interface
-            # Just methods + events stubs
-            inh_msgs = (WLMessage * 1)()
-            inh_msgs[0] = WLMessage(b"destroy", b"", None)
-
-            inh_iface = WLInterface(
-                b"zwp_keyboard_shortcuts_inhibitor_v1",
-                1, 1, inh_msgs, 1, None
-            )
-
-            # wl_proxy_marshal_constructor(proxy, opcode, interface, ...)
-            # opcode 1 = create_inhibitor
-            # args: new_id interface, object (wl_surface)
-            wl_proxy_marshal_con_v2 = libwl.wl_proxy_marshal_constructor
-            wl_proxy_marshal_con_v2.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
-                                                  ctypes.POINTER(WLInterface),
-                                                  ctypes.c_void_p]
-            wl_proxy_marshal_con_v2.restype = ctypes.c_void_p
-
-            inh_ptr = wl_proxy_marshal_con_v2(mgr_ptr, 1,
-                                              ctypes.byref(inh_iface),
-                                              ctypes.c_void_p(surf_ptr))
-            if not inh_ptr:
-                return
-
-            self._inhibitor = ctypes.c_void_p(inh_ptr)
-
-            # Add listener for "active" event
-            ACTIVE_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p,
-                                          ctypes.c_void_p)
-
-            def on_active(data, inhibitor):
-                self._active = True
-
-            active_cb = ACTIVE_CB(on_active)
-
-            class InhibitorListener(ctypes.Structure):
-                _fields_ = [("active", ACTIVE_CB)]
-
-            il = InhibitorListener(active_cb)
-            wl_proxy_add_listener(inh_ptr, ctypes.byref(il), None)
-
-            wl_display_roundtrip(wl_disp)
-
-        except Exception:
-            self._inhibitor = None
-            self._active = False
+    def __init__(self):
+        self._state = None
+        lib = self._ensure_lib()
+        if lib:
+            self._state = lib.ghost_inhibit_start()
 
     @property
     def active(self):
-        return self._active
+        if not self._state:
+            return False
+        return bool(self._ensure_lib().ghost_inhibit_is_active(self._state))
 
     def destroy(self):
-        if self._inhibitor and self._libwl:
-            try:
-                # opcode 0 = destroy (destructor)
-                marshal = self._libwl.wl_proxy_marshal
-                marshal.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-                marshal(self._inhibitor, 0)
-            except Exception:
-                pass
-        self._inhibitor = None
-        self._active = False
+        if self._state:
+            lib = self._ensure_lib()
+            if lib:
+                lib.ghost_inhibit_stop(self._state)
+            self._state = None
 
 
 # ─── Shared base class ─────────────────────────────────────────────────
@@ -1132,29 +931,20 @@ class GtkGhostScreen(GhostScreen):
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gdk, Gtk
 
-        # 1. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
-        if _inhibit_gnome_shortcuts():
-            self._gnome_restore = True
+        # 1. Try keyboard shortcuts inhibitor (C .so helper, Wayland protocol)
+        try:
+            blk = WaylandShortcutBlocker()
+            if blk._state:
+                self._shortcut_blocker = blk
+        except Exception:
+            pass
 
-        # 2. Try keyboard shortcuts inhibitor (Wayland protocol)
-        if not self._gnome_restore:
-            try:
-                gdk_win = self._window.get_window()
-                if gdk_win:
-                    import ctypes
-                    libgdk = ctypes.CDLL("libgdk-3.so.0")
-                    get_surf = libgdk.gdk_wayland_window_get_wl_surface
-                    get_surf.argtypes = [ctypes.c_void_p]
-                    get_surf.restype = ctypes.c_void_p
-                    surf_ptr = get_surf(ctypes.c_void_p(hash(gdk_win)))
-                    if surf_ptr:
-                        blk = WaylandShortcutBlocker(surf_ptr)
-                        if blk.active:
-                            self._shortcut_blocker = blk
-            except Exception:
-                pass
+        # 2. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
+        if not self._shortcut_blocker:
+            if _inhibit_gnome_shortcuts():
+                self._gnome_restore = True
 
-        # 3. Seat grab as final fallback
+        # 3. Seat grab (blocks client-level input)
         try:
             gdk_win = self._window.get_window()
             if not gdk_win:

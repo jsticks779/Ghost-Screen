@@ -103,7 +103,7 @@ class GhostScreen:
                 else:
                     self.cfg[k] = v
 
-        self.root = tk.Tk()
+        self.root = self.tk.Tk()
         self._setup_window()
         self._setup_canvas()
         self._init_particles()
@@ -120,7 +120,7 @@ class GhostScreen:
         self.sh = self.root.winfo_screenheight()
 
     def _setup_canvas(self):
-        self.canvas = tk.Canvas(
+        self.canvas = self.tk.Canvas(
             self.root,
             width=self.sw, height=self.sh,
             highlightthickness=0,

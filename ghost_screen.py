@@ -1689,7 +1689,10 @@ if sys.platform == "win32":
                 self._win32con.WS_POPUP,
                 0, 0, self.sw, self.sh, 0, 0, wc.hInstance, None)
 
-            self._win32gui.ShowWindow(self._hwnd, self._win32con.SW_SHOWNOACTIVATE)
+            if not self._hwnd:
+                raise RuntimeError("CreateWindowEx returned NULL")
+
+            self._win32gui.ShowWindow(self._hwnd, 4)
             self._win32gui.UpdateWindow(self._hwnd)
             from PIL import Image
             blank = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))

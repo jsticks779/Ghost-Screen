@@ -1412,14 +1412,17 @@ class GtkGhostScreen(GhostScreen):
 
 def create_ghost_screen(cfg=None):
     display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
+    print(f"  Display server: {display_type}")
     if display_type == "wayland":
         try:
             from PIL import Image, ImageDraw
+            print("  Backend: GTK3 (Wayland)")
             return GtkGhostScreen(cfg)
         except ImportError:
-            print("Pillow not installed; install python3-pil for Wayland transparency.")
+            print("  Pillow not installed; install python3-pil for Wayland transparency.")
         except Exception as e:
-            print(f"Wayland backend failed ({e}), falling back to X11.")
+            print(f"  Wayland backend failed ({e}), falling back to X11.")
+    print("  Backend: Tkinter (X11)")
     return TkinterGhostScreen(cfg)
 
 

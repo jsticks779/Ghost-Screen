@@ -1619,6 +1619,15 @@ if sys.platform == "win32":
             self._user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
             self._user32.GetAsyncKeyState.restype = ctypes.c_short
 
+            self._user32.SetLayeredWindowAttributes.argtypes = [
+                wintypes.HWND, ctypes.c_uint32, ctypes.c_ubyte, ctypes.c_uint32]
+            self._user32.SetLayeredWindowAttributes.restype = ctypes.c_bool
+
+            self._user32.SetWindowPos.argtypes = [
+                wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+            self._user32.SetWindowPos.restype = ctypes.c_bool
+
             self._user32.GetDC.argtypes = [wintypes.HWND]
             self._user32.GetDC.restype = wintypes.HDC
             self._user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
@@ -1629,6 +1638,11 @@ if sys.platform == "win32":
             self._gdi32.CreateCompatibleDC.restype = wintypes.HDC
             self._gdi32.DeleteDC.argtypes = [wintypes.HDC]
             self._gdi32.DeleteDC.restype = ctypes.c_bool
+
+            self._gdi32.BitBlt.argtypes = [
+                wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_uint32]
+            self._gdi32.BitBlt.restype = ctypes.c_bool
 
             class POINT(ctypes.Structure):
                 _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
@@ -1679,6 +1693,7 @@ if sys.platform == "win32":
             wc.lpfnWndProc = self._wndproc
             wc.hInstance = self._win32api.GetModuleHandle(None)
             wc.lpszClassName = "GhostScreenWin"
+            wc.hbrBackground = self._win32gui.GetStockObject(5)
             self._class = self._win32gui.RegisterClass(wc)
             self._write_sleep_log(f"RegisterClass done, atom={self._class}")
 
@@ -1687,7 +1702,7 @@ if sys.platform == "win32":
             self._write_sleep_log(f"Screen size: {self.sw}x{self.sh}")
 
             self._hwnd = self._win32gui.CreateWindowEx(
-                0x80000 | 0x8 | 0x20 | 0x80,
+                0x80000 | 0x8 | 0x80,
                 wc.lpszClassName, "Ghost Screen",
                 0x80000000,
                 0, 0, self.sw, self.sh, 0, 0, wc.hInstance, None)
@@ -1696,12 +1711,14 @@ if sys.platform == "win32":
             if not self._hwnd:
                 raise RuntimeError("CreateWindowEx returned NULL")
 
+            self._user32.SetLayeredWindowAttributes(
+                self._hwnd, 0, int(255 * 0.88), 2)
+            self._write_sleep_log("SetLayeredWindowAttributes done")
+
             self._win32gui.ShowWindow(self._hwnd, 4)
             self._win32gui.UpdateWindow(self._hwnd)
-            from PIL import Image
-            blank = Image.new("RGBA", (self.sw, self.sh), (5, 5, 16, 255))
-            self._display_frame(blank)
-            self._win32gui.SetForegroundWindow(self._hwnd)
+            self._user32.SetWindowPos(self._hwnd, -1, 0, 0, 0, 0, 0x0002 | 0x0001)
+            self._write_sleep_log("Window shown, topmost set")
             self._write_sleep_log("Window initialized")
 
         def _register_hotkey(self):
@@ -1825,7 +1842,7 @@ if sys.platform == "win32":
                 gy = cy + float_y
                 scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
 
-                img = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
+                img = Image.new("RGBA", (self.sw, self.sh), (5, 5, 16, 255))
                 draw = ImageDraw.Draw(img)
                 self._draw_vignette(draw, t, c)
                 self._draw_grid(draw, t, cx, cy, c["grid"])
@@ -1833,7 +1850,15 @@ if sys.platform == "win32":
                 self._draw_ghost(draw, t, cx, gy, scale, c)
                 self._draw_particles(draw, t, c["particle"], c["primary"])
                 self._draw_hud(draw, t, cx, gy, scale, c["accent"])
-                self._display_frame(img)
+
+                hdc = self._win32gui.GetDC(self._hwnd)
+                memdc = self._gdi32.CreateCompatibleDC(hdc)
+                from PIL import ImageWin
+                dib = ImageWin.Dib(img)
+                dib.draw(memdc, (0, 0, self.sw, self.sh))
+                self._gdi32.BitBlt(hdc, 0, 0, self.sw, self.sh, memdc, 0, 0, 0xCC0020)
+                self._gdi32.DeleteDC(memdc)
+                self._win32gui.ReleaseDC(self._hwnd, hdc)
             except Exception as e:
                 import traceback
                 traceback.print_exc()

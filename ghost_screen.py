@@ -1705,9 +1705,11 @@ if sys.platform == "win32":
             self._kernel32.SetThreadExecutionState(
                 self._ES_CONTINUOUS | self._ES_SYSTEM_REQUIRED |
                 self._ES_DISPLAY_REQUIRED)
+            self._sleep_inhibited = True
 
         def _restore_sleep(self):
             self._kernel32.SetThreadExecutionState(self._ES_CONTINUOUS)
+            self._sleep_inhibited = False
 
         def _wndproc(self, hwnd, msg, wparam, lparam):
             if msg == self._win32con.WM_HOTKEY and wparam == self._hotkey_id:
@@ -1885,7 +1887,7 @@ def _run_idle_watchdog(idle_minutes):
             app = create_ghost_screen()
             if app._sleep_inhibited:
                 print("  Sleep blocked while ghost is active — toggle off to allow sleep.")
-            else:
+            elif sys.platform != "win32":
                 print("  Warning: Could not acquire sleep inhibitor — PC may still sleep.")
             try:
                 app.run()
@@ -2064,6 +2066,8 @@ def main():
             sys.exit(1)
         if app._sleep_inhibited:
             print("  Sleep blocked while ghost is active — toggle off to allow sleep.")
+        elif sys.platform == "win32":
+            pass  # sleep blocking is handled internally via SetThreadExecutionState
         else:
             print("  Warning: Could not acquire sleep inhibitor — PC may still sleep.")
             print("  Install systemd or python3-gi for sleep inhibition.")

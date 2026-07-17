@@ -78,11 +78,15 @@ After running it, **Ctrl+3** works immediately — no Settings menu needed.
 ## Usage
 
 ```bash
-ghost-screen                    # toggle on/off
-ghost-screen --kill             # force stop
-ghost-screen --version          # show version
-ghost-screen --check            # verify dependencies
-ghost-screen --shortcut "COMBO" # change keyboard shortcut
+ghost-screen                         # toggle on/off
+ghost-screen --kill                  # force stop
+ghost-screen --version               # show version
+ghost-screen --check                 # verify dependencies
+ghost-screen --shortcut "COMBO"      # change keyboard shortcut
+ghost-screen --autostart enable      # launch on login
+ghost-screen --autostart disable     # remove from autostart
+ghost-screen --autostart status      # check autostart status
+ghost-screen --idle 10               # activate after 10min idle (screensaver mode)
 ```
 
 The **only** way to dismiss the ghost is pressing your shortcut again (toggle off).

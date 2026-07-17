@@ -15,6 +15,7 @@ done
 
 rm -f "$HOME/.local/share/applications/$NAME.desktop"
 rm -f "$HOME/.config/autostart/xbindkeys.desktop"
+rm -f "$HOME/.config/autostart/$NAME.desktop"
 rm -f "/usr/local/share/applications/$NAME.desktop" 2>/dev/null || true
 
 # Determine which binary was installed

@@ -861,12 +861,14 @@ class TkinterGhostScreen(GhostScreen):
         import tkinter as tk
         self._root = tk.Tk()
         self._root.title(PROJECT)
-        self._root.attributes("-fullscreen", True)
+        self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
         self._root.attributes("-alpha", self.cfg["opacity"])
-        self._root.overrideredirect(True)
+        # Span all monitors
         self.sw = self._root.winfo_screenwidth()
         self.sh = self._root.winfo_screenheight()
+        self._root.geometry(f"{self.sw}x{self.sh}+0+0")
+        self._root.attributes("-fullscreen", True)
 
         self._canvas = tk.Canvas(
             self._root, width=self.sw, height=self.sh,
@@ -1192,11 +1194,20 @@ class GtkGhostScreen(GhostScreen):
 
         display = Gdk.Display.get_default()
         if display:
-            mon = (display.get_monitor(0) or
-                   (getattr(display, "get_primary_monitor", lambda: None)()))
-            if mon:
-                geo = mon.get_geometry()
-                self.sw, self.sh = geo.width, geo.height
+            n_mons = display.get_n_monitors()
+            min_x = min_y = 0
+            max_x = max_y = 0
+            for i in range(n_mons):
+                mon = display.get_monitor(i)
+                if mon:
+                    geo = mon.get_geometry()
+                    min_x = min(min_x, geo.x)
+                    min_y = min(min_y, geo.y)
+                    max_x = max(max_x, geo.x + geo.width)
+                    max_y = max(max_y, geo.y + geo.height)
+            if max_x > 0 and max_y > 0:
+                self.sw = max_x - min_x
+                self.sh = max_y - min_y
         if not self.sw:
             self.sw, self.sh = 1920, 1080
 
@@ -1545,6 +1556,102 @@ class GtkGhostScreen(GhostScreen):
         scan_y = (t * 60) % self.sh
         draw.line([(0, scan_y), (self.sw, scan_y)], fill=col, width=1)
 
+# ─── Autostart ──────────────────────────────────────────────────────────
+
+AUTOSTART_DIR = os.path.expanduser("~/.config/autostart")
+AUTOSTART_FILE = os.path.join(AUTOSTART_DIR, "ghost-screen.desktop")
+
+def _autostart_enable():
+    cmd = _get_cmd_path()
+    os.makedirs(AUTOSTART_DIR, exist_ok=True)
+    with open(AUTOSTART_FILE, "w") as f:
+        f.write("[Desktop Entry]\n"
+                "Type=Application\n"
+                f"Name={PROJECT}\n"
+                f"Exec={cmd}\n"
+                "Terminal=false\n"
+                "X-GNOME-Autostart-enabled=true\n")
+    return True, "Autostart enabled."
+
+def _autostart_disable():
+    if os.path.exists(AUTOSTART_FILE):
+        os.remove(AUTOSTART_FILE)
+    return True, "Autostart disabled."
+
+def _autostart_status():
+    enabled = os.path.exists(AUTOSTART_FILE)
+    return enabled, f"Autostart: {'enabled' if enabled else 'disabled'}"
+
+# ─── Idle watchdog ──────────────────────────────────────────────────────
+
+def _get_idle_ms():
+    try:
+        import gi
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio, GLib
+        conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        # Try freedesktop ScreenSaver (works on GNOME, KDE, XFCE, MATE)
+        try:
+            result = conn.call_sync(
+                "org.freedesktop.ScreenSaver", "/ScreenSaver",
+                "org.freedesktop.ScreenSaver", "GetSessionIdleTime",
+                None, GLib.VariantType.new("(u)"),
+                Gio.DBusCallFlags.NONE, 2000, None)
+            return result.unpack()[0] * 1000
+        except Exception:
+            pass
+        # Fallback: logind IdleHint on the session seat
+        try:
+            result = conn.call_sync(
+                "org.freedesktop.login1", "/org/freedesktop/login1/seat/self",
+                "org.freedesktop.DBus.Properties", "Get",
+                GLib.Variant("(ss)", ["org.freedesktop.login1.Seat", "IdleHint"]),
+                GLib.VariantType.new("(v)"),
+                Gio.DBusCallFlags.NONE, 2000, None)
+            val = result.unpack()[0]
+            if val.get_boolean():
+                result2 = conn.call_sync(
+                    "org.freedesktop.login1", "/org/freedesktop/login1/seat/self",
+                    "org.freedesktop.DBus.Properties", "Get",
+                    GLib.Variant("(ss)", ["org.freedesktop.login1.Seat", "IdleSinceHint"]),
+                    GLib.VariantType.new("(v)"),
+                    Gio.DBusCallFlags.NONE, 2000, None)
+                since = result2.unpack()[0].get_uint64()
+                import time
+                return int((time.time() * 1000000 - since) / 1000)
+            return 0
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return -1  # unknown
+
+
+def _run_idle_watchdog(idle_minutes):
+    import time
+    print(f"  Idle watchdog active — ghost will activate after {idle_minutes}m of inactivity.")
+    while True:
+        idle_ms = _get_idle_ms()
+        if idle_ms < 0:
+            time.sleep(10)
+            continue
+        if idle_ms >= idle_minutes * 60 * 1000:
+            print(f"  Idle threshold reached ({idle_ms/1000:.0f}s) — activating ghost.")
+            _write_sleep_log(f"Idle activated ({idle_ms/1000:.0f}s idle)")
+            app = create_ghost_screen()
+            if app._sleep_inhibited:
+                print("  Sleep blocked while ghost is active — toggle off to allow sleep.")
+            else:
+                print("  Warning: Could not acquire sleep inhibitor — PC may still sleep.")
+            try:
+                app.run()
+            except Exception:
+                pass
+            print("  Ghost dismissed — resuming idle monitor.")
+            _write_sleep_log("Idle cycle ended — resuming monitor")
+        time.sleep(max(5, idle_minutes * 30))
+
+
 # ─── Factory ───────────────────────────────────────────────────────────
 
 def create_ghost_screen(cfg=None):
@@ -1629,10 +1736,22 @@ def main():
     parser.add_argument("--check", "-c", action="store_true", help="Check dependencies")
     parser.add_argument("--shortcut", "-s", type=str, metavar="COMBO",
                         help="Set keyboard shortcut (e.g. Ctrl+Shift+G)")
+    parser.add_argument("--autostart", type=str, metavar="enable|disable|status",
+                        choices=["enable", "disable", "status"],
+                        help="Manage autostart on login")
+    parser.add_argument("--idle", type=int, metavar="MINUTES", default=0,
+                        help="Auto-activate ghost after N minutes idle (screensaver mode)")
     args = parser.parse_args()
 
     if args.shortcut:
         ok, msg = _set_shortcut(args.shortcut)
+        print(msg)
+        sys.exit(0 if ok else 1)
+
+    if args.autostart:
+        fn = {"enable": _autostart_enable, "disable": _autostart_disable,
+              "status": _autostart_status}[args.autostart]
+        ok, msg = fn()
         print(msg)
         sys.exit(0 if ok else 1)
 
@@ -1645,6 +1764,10 @@ def main():
 
     if args.kill:
         kill_ghost()
+        sys.exit(0)
+
+    if args.idle:
+        _run_idle_watchdog(args.idle)
         sys.exit(0)
 
     if is_running():

@@ -869,11 +869,11 @@ class TkinterGhostScreen(GhostScreen):
         self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
         self._root.attributes("-alpha", self.cfg["opacity"])
-        # Span all monitors
         self.sw = self._root.winfo_screenwidth()
         self.sh = self._root.winfo_screenheight()
         self._root.geometry(f"{self.sw}x{self.sh}+0+0")
-        self._root.attributes("-fullscreen", True)
+        if sys.platform != "win32":
+            self._root.attributes("-fullscreen", True)
 
         self._canvas = tk.Canvas(
             self._root, width=self.sw, height=self.sh,

@@ -2,8 +2,10 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 
 const DIR = __dirname;
+const IS_WIN = os.platform() === "win32";
 
 function run(cmd, opts = {}) {
   try {
@@ -20,12 +22,21 @@ function postinstall() {
     process.argv.includes("global") ||
     __dirname.includes("node_modules/.pnpm") ||
     __dirname.includes("nvm") ||
-    __dirname.includes("/usr/lib/node_modules");
+    __dirname.includes("/usr/lib/node_modules") ||
+    __dirname.includes("/usr/local/lib/node_modules");
 
-  // Check display server
-  const sessionType = process.env.XDG_SESSION_TYPE || "x11";
+  if (IS_WIN) {
+    console.log("    Platform: Windows");
+    // Install Python deps
+    run('pip install pywin32 pillow --quiet --upgrade', { timeout: 60000 });
+    // Ensure .py is executable via the npm bin shim (it handles shebangs)
+    console.log("    Python packages installed (pywin32, pillow).");
+    console.log('  Install complete!');
+    console.log('  Run: npx ghost-screen');
+    return;
+  }
 
-  // Build Wayland shortcut inhibitor (.so)
+  // Linux build steps
   const hasGcc = run("command -v gcc");
   const hasWaylandScanner = run("command -v wayland-scanner");
   const xmlPath = path.join(DIR, "keyboard-shortcuts-inhibit-unstable-v1.xml");
@@ -40,7 +51,6 @@ function postinstall() {
     }
   }
 
-  // Build touch inhibitor
   if (hasGcc && fs.existsSync(path.join(DIR, "ghost_touch_inhibit.c"))) {
     console.log("    Building touch input inhibitor...");
     run("gcc -O2 -o ghost-touch-inhibit ghost_touch_inhibit.c -Wall");
@@ -51,7 +61,6 @@ function postinstall() {
     }
   }
 
-  // Ensure ghost_screen.py is executable
   try {
     fs.chmodSync(path.join(DIR, "ghost_screen.py"), 0o755);
   } catch {}

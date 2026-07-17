@@ -6,7 +6,7 @@
   "license": "MIT",
   "author": "",
   "keywords": ["screensaver", "overlay", "cyberpunk", "linux", "wayland", "x11"],
-  "os": ["linux"],
+  "os": ["linux", "win32"],
   "preferGlobal": true,
   "bin": {
     "ghost-screen": "./ghost_screen.py"

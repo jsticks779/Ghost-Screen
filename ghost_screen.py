@@ -1630,19 +1630,45 @@ if sys.platform == "win32":
                     ("time", ctypes.c_uint32),
                     ("dwExtraInfo", ctypes.c_size_t),
                 ]
+            import atexit
+            _debug_log = None
+            try:
+                _debug_log = open(
+                    os.path.join(tempfile.gettempdir(), "ghost_kbd_hook.log"),
+                    "w", buffering=1)
+                atexit.register(_debug_log.close)
+            except Exception:
+                pass
+
             def kbd_proc(nCode, wParam, lParam):
                 nonlocal ctrl_down
                 if nCode >= 0:
                     kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                    if _debug_log:
+                        _debug_log.write(
+                            f"msg={wParam:#x} vk={kb.vkCode:#x} ctrl={ctrl_down}\n")
                     if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
                         if kb.vkCode == VK_CONTROL:
                             ctrl_down = True
                             return 1
                         if kb.vkCode == VK_3 and ctrl_down:
-                            # Schedule toggle on main loop to avoid reentrancy
+                            app._quit = True
                             if app._root:
                                 try:
-                                    app._root.after_idle(app._toggle_off)
+                                    app._restore_sleep()
+                                    app._uninstall_hooks()
+                                except Exception:
+                                    pass
+                                try:
+                                    app._root.grab_release()
+                                except Exception:
+                                    pass
+                                try:
+                                    app._root.destroy()
+                                except Exception:
+                                    pass
+                                try:
+                                    app._root.quit()
                                 except Exception:
                                     pass
                             return 1

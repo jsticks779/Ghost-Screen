@@ -757,6 +757,7 @@ class TkinterGhostScreen(GhostScreen):
         self._root = None
         self._canvas = None
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
+        signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
 
     def _signal_quit(self):
         self._quit = True
@@ -1055,6 +1056,7 @@ class GtkGhostScreen(GhostScreen):
         self._toggle_keyval = 0
         self._init_toggle_key()
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
+        signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
         self._init_once()
         self._create_window()
         import gi

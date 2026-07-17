@@ -156,6 +156,13 @@ npm uninstall -g ghost-screen   # if installed via npm
 ### Windows
 
 ```powershell
+pip uninstall pywin32 pillow -y
+Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
+```
+
+### Windows
+
+```powershell
 Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
 ```
 

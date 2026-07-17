@@ -527,7 +527,8 @@ def _find_touch_devices():
             dev_path = os.path.join(base, name, "device", "name")
             if not os.path.isfile(dev_path):
                 continue
-            dev_name = open(dev_path).read().strip().lower()
+            with open(dev_path) as f:
+                dev_name = f.read().strip().lower()
             if any(k in dev_name for k in ("touch", "finger", "touchpad")):
                 inhibited = os.path.join(base, name, "device", "inhibited")
                 if os.path.isfile(inhibited):
@@ -682,6 +683,13 @@ class GhostScreen:
             with open(SLEEP_LOG, "a") as f:
                 import datetime
                 f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _reset_sleep_log():
+        try:
+            open(SLEEP_LOG, "w").close()
         except Exception:
             pass
 
@@ -1069,6 +1077,7 @@ class GtkGhostScreen(GhostScreen):
         import gi
         gi.require_version("Gdk", "3.0")
         from gi.repository import Gdk
+        self._Gdk = Gdk
         combo = _get_toggle_combo()
         mods, key = parse_shortcut(combo)
         mod_map = {"Ctrl": Gdk.ModifierType.CONTROL_MASK,
@@ -1092,6 +1101,8 @@ class GtkGhostScreen(GhostScreen):
         gi.require_version("Gdk", "3.0")
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gdk, Gtk, GLib, GdkPixbuf
+        self._Gdk = Gdk
+        self._Gtk = Gtk
         self._GdkPixbuf = GdkPixbuf
         self._GLib = GLib
 
@@ -1143,10 +1154,7 @@ class GtkGhostScreen(GhostScreen):
         self._grab_input()
 
     def _grab_input(self):
-        import gi
-        gi.require_version("Gdk", "3.0")
-        gi.require_version("Gtk", "3.0")
-        from gi.repository import Gdk, Gtk
+        Gdk = self._Gdk
 
         # 1. Try keyboard shortcuts inhibitor (C .so helper, Wayland protocol)
         try:
@@ -1199,9 +1207,7 @@ class GtkGhostScreen(GhostScreen):
             self._grab_active = False
 
     def _on_consume(self, widget, event):
-        import gi
-        gi.require_version("Gdk", "3.0")
-        from gi.repository import Gdk
+        Gdk = self._Gdk
         if event.type in (Gdk.EventType.KEY_PRESS, Gdk.EventType.KEY_RELEASE):
             self._write_sleep_log(
                 f"KEY{'UP' if event.type == Gdk.EventType.KEY_RELEASE else 'DOWN'}: "
@@ -1545,6 +1551,7 @@ def main():
     else:
         atexit.register(_restore_touchpad)
         atexit.register(_restore_touch_devices)
+        GhostScreen._reset_sleep_log()
         try:
             app = create_ghost_screen()
         except Exception as e:

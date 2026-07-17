@@ -1607,7 +1607,7 @@ if sys.platform == "win32":
             self._kernel32.SetThreadExecutionState.restype = wintypes.DWORD
 
             self._prevent_sleep()
-            self._install_hooks()
+            # Hooks installed in run() after _create_window()
 
         def _prevent_sleep(self):
             self._kernel32.SetThreadExecutionState(
@@ -1821,6 +1821,7 @@ if sys.platform == "win32":
 
         def run(self):
             self._create_window()
+            self._install_hooks()
             while not self._quit:
                 try:
                     self._root.mainloop()

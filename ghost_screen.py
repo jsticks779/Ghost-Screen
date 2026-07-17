@@ -1689,12 +1689,11 @@ if sys.platform == "win32":
                 self._win32con.WS_POPUP,
                 0, 0, self.sw, self.sh, 0, 0, wc.hInstance, None)
 
-            self._win32gui.SetLayeredWindowAttributes(
-                self._hwnd, 0, int(255 * self.cfg["opacity"]),
-                self._win32con.LWA_ALPHA)
-
-            self._win32gui.ShowWindow(self._hwnd, self._win32con.SW_SHOW)
+            self._win32gui.ShowWindow(self._hwnd, self._win32con.SW_SHOWNOACTIVATE)
             self._win32gui.UpdateWindow(self._hwnd)
+            from PIL import Image
+            blank = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
+            self._display_frame(blank)
             self._win32gui.SetForegroundWindow(self._hwnd)
 
         def _register_hotkey(self):
@@ -1839,7 +1838,7 @@ if sys.platform == "win32":
             dib = ImageWin.Dib(img)
             dib.draw(memdc, (0, 0, self.sw, self.sh))
 
-            blend = self._BLENDFUNCTION(0, 0, 0xff, 1)
+            blend = self._BLENDFUNCTION(0, 0, int(255 * self.cfg["opacity"]), 1)
             pt_dst = self._POINT(0, 0)
             sz = self._SIZE(self.sw, self.sh)
             pt_src = self._POINT(0, 0)

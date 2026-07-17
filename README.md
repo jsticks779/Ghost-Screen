@@ -60,15 +60,16 @@ packages and set up the SUID helper for input blocking. Full install takes
 
 ### Windows
 
-**PowerShell** (run as Administrator):
+**Run PowerShell as Administrator**, then paste:
+
 ```powershell
-powershell -c "iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1'))"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1'))
 ```
 
-Or manually:
+Or install manually in any terminal:
 ```powershell
 pip install pywin32 pillow
-# Download https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/ghost_screen.py
+curl -fsSL -o ghost_screen.py https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/ghost_screen.py
 python ghost_screen.py
 ```
 

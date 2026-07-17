@@ -4,8 +4,16 @@
   Install Ghost Screen on Windows
 .DESCRIPTION
   Installs Python (if missing), pywin32 + pillow, and the ghost-screen script.
-  Can be run via: iex ((New-Object Net.WebClient).DownloadString('URL'))
+  Run as Administrator:
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('URL'))
 #>
+
+# Ensure we're not nesting PowerShell unnecessarily
+if ($MyInvocation.Line -match '^powershell ') {
+    Write-Host "    Don't wrap this in 'powershell -c' — run the iex command directly from an admin PowerShell prompt." -ForegroundColor Red
+    Write-Host "    Correct: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('...'))" -ForegroundColor Yellow
+    exit 1
+}
 
 $REPO = "https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main"
 $SCRIPT_NAME = "ghost_screen.py"

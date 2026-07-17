@@ -637,6 +637,7 @@ class GhostScreen:
         self._inhibitor = None
         self._inhibit_fd = None
         self._grab_active = False
+        self._sleep_inhibited = False
         self._acquire_inhibitor()
 
     def _init_particles(self):
@@ -677,6 +678,7 @@ class GhostScreen:
 
     def _acquire_inhibitor(self):
         self._inhibit_fd = None
+        self._sleep_inhibited = False
         # Try direct D-Bus approach (most reliable — works on all systemd Linux)
         try:
             import gi
@@ -692,6 +694,7 @@ class GhostScreen:
                 Gio.DBusCallFlags.NONE, -1, None, None,
             )
             self._inhibit_fd = fd_list.get(0)
+            self._sleep_inhibited = True
             return
         except Exception:
             pass
@@ -704,10 +707,12 @@ class GhostScreen:
                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            self._sleep_inhibited = True
         except Exception:
             self._inhibitor = None
 
     def _release_inhibitor(self):
+        self._sleep_inhibited = False
         if self._inhibit_fd is not None:
             try:
                 import os
@@ -1436,10 +1441,31 @@ def check_deps():
             print(f"  [WL]   Pillow:   MISSING (install python3-pil)")
             ok = False
 
-    if ok:
-        print(f"\n  All dependencies satisfied.")
+    print()
+    # Check sleep inhibition availability
+    dbus_ok = False
+    sd_ok = shutil.which("systemd-inhibit") is not None
+    try:
+        import gi
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio
+        conn = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        dbus_ok = True
+    except Exception:
+        pass
+
+    if dbus_ok:
+        print("  [SLP] D-Bus logind:   OK  (sleep will be blocked)")
+    elif sd_ok:
+        print("  [SLP] systemd-inhibit: OK  (sleep will be blocked)")
     else:
-        print(f"\n  Some dependencies missing — see above.")
+        print("  [SLP] Sleep inhibit:  NONE (PC may sleep)")
+        ok = False
+
+    if ok:
+        print("\n  All dependencies satisfied.")
+    else:
+        print("\n  Some dependencies missing — see above.")
     sys.exit(0 if ok else 1)
 
 
@@ -1474,9 +1500,17 @@ def main():
     else:
         atexit.register(_restore_touchpad)
         atexit.register(_restore_touch_devices)
-        print("  Sleep blocked while ghost is active — toggle off to allow sleep.")
         try:
             app = create_ghost_screen()
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        if app._sleep_inhibited:
+            print("  Sleep blocked while ghost is active — toggle off to allow sleep.")
+        else:
+            print("  Warning: Could not acquire sleep inhibitor — PC may still sleep.")
+            print("  Install systemd or python3-gi for sleep inhibition.")
+        try:
             app.run()
         except KeyboardInterrupt:
             print()

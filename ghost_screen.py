@@ -1618,6 +1618,8 @@ if sys.platform == "win32":
             VK_CONTROL = 0x11
             WM_KEYDOWN = 0x100
             WM_KEYUP = 0x101
+            WM_SYSKEYDOWN = 0x104
+            WM_SYSKEYUP = 0x105
             app = self
             ctrl_down = False
             class KBDLLHOOKSTRUCT(ctypes.Structure):
@@ -1632,22 +1634,20 @@ if sys.platform == "win32":
                 nonlocal ctrl_down
                 if nCode >= 0:
                     kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-                    if wParam == WM_KEYDOWN:
+                    if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
                         if kb.vkCode == VK_CONTROL:
                             ctrl_down = True
                             return 1
                         if kb.vkCode == VK_3 and ctrl_down:
-                            app._restore_sleep()
-                            app._uninstall_hooks()
-                            app._quit = True
+                            # Schedule toggle on main loop to avoid reentrancy
                             if app._root:
                                 try:
-                                    app._root.quit()
+                                    app._root.after_idle(app._toggle_off)
                                 except Exception:
                                     pass
                             return 1
                         return 1
-                    if wParam == WM_KEYUP:
+                    if wParam in (WM_KEYUP, WM_SYSKEYUP):
                         if kb.vkCode == VK_CONTROL:
                             ctrl_down = False
                         return 1

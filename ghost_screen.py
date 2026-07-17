@@ -698,7 +698,7 @@ class GhostScreen:
         self._sleep_inhibited = False
         # Try direct D-Bus approach (most reliable — works on all systemd Linux)
         try:
-            import gi
+            import gi, os
             gi.require_version("Gio", "2.0")
             from gi.repository import Gio, GLib
             conn = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
@@ -710,7 +710,8 @@ class GhostScreen:
                 GLib.VariantType.new("(h)"),
                 Gio.DBusCallFlags.NONE, -1, None, None,
             )
-            self._inhibit_fd = fd_list.get(0)
+            # Dup the FD so we own it — UnixFDList closes its FDs when freed
+            self._inhibit_fd = os.dup(fd_list.get(0))
             self._sleep_inhibited = True
             self._write_sleep_log("OK (D-Bus logind)")
             return

@@ -851,7 +851,8 @@ class TkinterGhostScreen(GhostScreen):
         self._root = None
         self._canvas = None
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
-        signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
+        if hasattr(signal, "SIGUSR1"):
+            signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
 
     def _signal_quit(self):
         self._quit = True

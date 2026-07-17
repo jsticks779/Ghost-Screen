@@ -1156,7 +1156,8 @@ class GtkGhostScreen(GhostScreen):
         self._toggle_hw_keycode = 0
         self._init_toggle_key()
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
-        signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
+        if hasattr(signal, "SIGUSR1"):
+            signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
         self._init_once()
         self._create_window()
         import gi

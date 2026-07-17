@@ -1082,6 +1082,9 @@ class GtkGhostScreen(GhostScreen):
                 mask |= gdk_mod
         self._toggle_mods = mask
         self._toggle_keyval = Gdk.keyval_from_name(key)
+        self._write_sleep_log(
+            f"Toggle combo: {combo} -> mods={mask} keyval={self._toggle_keyval}"
+        )
 
     def _init_once(self):
         import gi
@@ -1170,7 +1173,10 @@ class GtkGhostScreen(GhostScreen):
                 )
                 if status != Gdk.GrabStatus.SUCCESS:
                     all_ok = False
+                    self._write_sleep_log(f"Seat grab FAILED: {status}")
             self._grab_active = all_ok
+            if all_ok:
+                self._write_sleep_log("Seat grab SUCCESS")
             self._window.connect("key-press-event", self._on_consume)
             self._window.connect("key-release-event", self._on_consume)
             self._window.connect("button-press-event", self._on_consume)
@@ -1193,8 +1199,16 @@ class GtkGhostScreen(GhostScreen):
                             Gdk.ModifierType.SUPER_MASK)
                 state = event.state & RELEVANT
                 if state == self._toggle_mods:
+                    self._write_sleep_log("TOGGLE KEY PRESSED - dismissing")
                     self._toggle_off()
                     return True
+                else:
+                    self._write_sleep_log(
+                        f"KEY PRESS: keyval={event.keyval} "
+                        f"state={event.state} mods={state} "
+                        f"expected_mods={self._toggle_mods} "
+                        f"expected_keyval={self._toggle_keyval}"
+                    )
         return True
 
     def _toggle_off(self):

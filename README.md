@@ -48,7 +48,6 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Obj
 Or install manually:
 
 ```powershell
-pip install pywin32 pillow
 curl -fsSL -o ghost_screen.py https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/ghost_screen.py
 python ghost_screen.py
 ```
@@ -59,7 +58,7 @@ python ghost_screen.py
 |----------|---------|-------------------|
 | Linux X11 | `tkinter` | `python3-tk` |
 | Linux Wayland | GTK3 + Pillow | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
-| Windows | `pywin32` + Pillow | `pip install pywin32 pillow` (auto) |
+| Windows | tkinter + ctypes | Built into Python — no install needed |
 
 After installing, press **Ctrl+3** to toggle the ghost on/off.
 
@@ -156,7 +155,6 @@ npm uninstall -g ghost-screen   # if installed via npm
 ### Windows
 
 ```powershell
-pip uninstall pywin32 pillow -y
 Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
 ```
 

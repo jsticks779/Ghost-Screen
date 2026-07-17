@@ -26,16 +26,6 @@ if (-not $python) {
     Write-Host "    Python installed." -ForegroundColor Green
 }
 
-# ── Ensure pip packages ────────────────────────────────────────────────
-Write-Host "    Installing Python packages (pywin32, pillow)..." -ForegroundColor Yellow
-try {
-    & $pythonExe -m pip install pywin32 pillow --quiet --upgrade 2>&1 | Out-Null
-    Write-Host "    Packages installed." -ForegroundColor Green
-} catch {
-    Write-Host "    Failed to install packages. Run manually: pip install pywin32 pillow" -ForegroundColor Red
-    exit 1
-}
-
 # ── Download script ────────────────────────────────────────────────────
 Write-Host "    Downloading ghost_screen.py..." -ForegroundColor Yellow
 if (-not (Test-Path $INSTALL_DIR)) {

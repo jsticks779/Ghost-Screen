@@ -1600,6 +1600,11 @@ if sys.platform == "win32":
             self._user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
             self._user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 
+            self._user32.SetTimer.argtypes = [
+                wintypes.HWND, wintypes.UINT_PTR, wintypes.UINT,
+                ctypes.c_void_p]
+            self._user32.SetTimer.restype = wintypes.UINT_PTR
+
             self._kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
             self._kernel32.SetThreadExecutionState.restype = wintypes.DWORD
 
@@ -1785,8 +1790,8 @@ if sys.platform == "win32":
             self._restore_sleep()
 
         def run(self):
-            self._win32gui.SetTimer(self._hwnd, self._timer_id,
-                                     self.cfg["frame_delay"], None)
+            self._user32.SetTimer(self._hwnd, self._timer_id,
+                                   self.cfg["frame_delay"], 0)
             self._win32gui.PumpMessages()
 
     # Reuse drawing methods from GtkGhostScreen

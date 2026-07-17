@@ -2,7 +2,7 @@
   <img src="logo.svg" alt="GHOSTSCREEN" width="580">
 </p>
 
-An animated tech ghost overlay for **any Linux desktop**. Toggle it on/off with
+An animated tech ghost overlay for **Linux & Windows**. Toggle it on/off with
 Ctrl+3 for a cyberpunk holographic screensaver effect.
 
 ## Features
@@ -10,29 +10,32 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 - Full-screen animated tech ghost with rotating geometric core
 - Circuit trace patterns, floating particles, scan lines, HUD brackets
 - Toggle on/off — same shortcut or command
+- **Cross-platform** — Linux (X11, Wayland) + Windows
 - **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/COSMIC/Deepin/LXQt)
 - **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
-- **Survives sleep/wake** — window auto-restarts after suspend on both backends
+- **Survives sleep/wake** — window auto-restarts after suspend on all backends
 - **Blocks PC sleep + screen blanking** while ghost is active — toggle off to allow sleep
-- Auto-darkens on X11 with tkinter (also works on XWayland as a fallback)
+- Auto-darkens on all platforms with an overlay window
 - Customizable colors, opacity, speed, and particle count
 - Dark semi-transparent overlay over your desktop
-- **Full input blocking** while ghost is active — keyboard, mouse, touchpad, touchscreen — on **every Linux compositor**
+- **Full input blocking** while ghost is active — keyboard, mouse, touchpad — on **every platform**
 
 ## Requirements
 
-- **Linux desktop** — X11 and Wayland are the only two display servers; auto-detected
-- **Python 3** — deps installed automatically by `install.sh`
+- **Python 3** — deps installed automatically
 
-| Display | Backend          | Required Packages                       |
-|---------|------------------|-----------------------------------------|
-| X11     | tkinter          | `python3-tk`                            |
-| Wayland | GTK3 + Pillow    | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
-| Wayland (inhibitor) | C shared library | `gcc`, `pkg-config`, `wayland-scanner` (auto-built by install.sh) |
+| Platform | Backend          | Required Packages                              |
+|----------|------------------|-------------------------------------------------|
+| Linux X11 | tkinter         | `python3-tk`                                   |
+| Linux Wayland | GTK3 + Pillow | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
+| Linux Wayland (inhibitor) | C shared library | `gcc`, `pkg-config`, `wayland-scanner` (auto-built) |
+| **Windows** | **pywin32 + Pillow** | `pip install pywin32 pillow` (auto-installed) |
 
 ## Installation (one command — fully automatic)
 
-Choose your method:
+Choose your platform and method:
+
+### Linux
 
 **curl** (recommended):
 ```bash
@@ -54,6 +57,20 @@ cd Ghost-Screen
 **You'll be prompted for `sudo`** — the script needs it to install system
 packages and set up the SUID helper for input blocking. Full install takes
 ~20 seconds.
+
+### Windows
+
+**PowerShell** (run as Administrator):
+```powershell
+powershell -c "iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1'))"
+```
+
+Or manually:
+```powershell
+pip install pywin32 pillow
+# Download https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/ghost_screen.py
+python ghost_screen.py
+```
 
 The install script auto-detects **everything**:
 
@@ -107,16 +124,15 @@ The **only** way to dismiss the ghost is pressing your shortcut again (toggle of
 ### Sleep / suspend behavior
 
 While the ghost is active, **PC sleep + screen blanking are blocked**
-automatically. A multi-backend inhibitor tries every available protocol:
+automatically:
 
-- **logind** (D-Bus): system suspend — works on any systemd/elogind Linux
-- **GNOME Session Manager**: screen blanking, lock, and suspend
-- **freedesktop PowerManagement**: screen blanking and idle suspend
-  (KDE, XFCE, MATE, LXQt)
-- **systemd-inhibit CLI**: fallback on all systemd systems
+- **Windows**: `SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)`
+- **Linux**: multi-backend inhibitor — logind D-Bus → GNOME Session Manager →
+  freedesktop PowerManagement → `systemd-inhibit` CLI fallback
 
-The ghost survives suspend/resume on both backends — if the window is
-destroyed during sleep, the process detects it and recreates it.
+All locks are released on toggle-off or `--kill`. The ghost survives
+suspend/resume — if the window is destroyed during sleep, the process
+detects it and recreates it.
 
 ## Keyboard Shortcut
 
@@ -199,6 +215,8 @@ Create a `ghost_screen.json` file next to the script:
 
 ## Uninstall
 
+### Linux
+
 ```bash
 # If installed via curl
 curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/uninstall.sh | bash
@@ -211,9 +229,15 @@ cd Ghost-Screen
 ./uninstall.sh
 ```
 
-All three methods remove the binary (from `/usr/local/bin` and `~/.local/bin`),
-desktop entry, **and clean up the Ctrl+3 shortcut** from all desktop
-environments and wlroots configs.
+All methods remove the binary (from `/usr/local/bin` and `~/.local/bin`),
+desktop entry, **and clean up the Ctrl+3 shortcut**.
+
+### Windows
+
+```powershell
+pip uninstall pywin32 pillow -y
+Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
+```
 
 Or do it manually:
 
@@ -228,8 +252,11 @@ Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if
 
 ## How It Works
 
-`ghost_screen.py` auto-detects your display server and picks the right backend:
+`ghost_screen.py` auto-detects your platform and picks the right backend:
 
+- **Windows** → `pywin32` layered window with per-pixel alpha, renders each
+  frame with Pillow, displayed via `UpdateLayeredWindow` — input blocked
+  with low-level keyboard/mouse hooks, toggle via `RegisterHotKey`
 - **Wayland** → GTK3 window with RGBA visual, renders each frame with Pillow,
   converts to `GdkPixbuf`, displays on a `Gtk.Image` — fully transparent
   background with no Cairo GI dependency
@@ -246,10 +273,13 @@ is detected internally (no compositor shortcut needed to dismiss).
 
 | Backend | Mechanism | Blocks |
 |---------|-----------|--------|
+| **Windows (pywin32)** | Low-level `WH_KEYBOARD_LL` + `WH_MOUSE_LL` hooks | Keyboard, mouse, touch — **all input** |
 | **Tkinter (X11)** | `grab_set_global()` — X11 global grab | Everything, including WM key bindings |
 | **GTK3 (Wayland, keyboard)** | `zwp_keyboard_shortcuts_inhibit_manager_v1` via C `.so` | Super key, Alt+Tab, all compositor keyboard shortcuts |
 | **GTK3 (Wayland, touch devices)** | SUID C helper inhibits kernel `input` device (`inhibited` sysfs) | Touchpad + touchscreen gestures, scroll, tap, cursor — **every Linux** |
 | **GTK3 (Wayland, client)** | `Gdk.Seat.grab()` seat grab | Mouse clicks, keyboard typing, pointer motion |
+
+On **Windows**, the ghost uses a layered transparent window via `pywin32` + `UpdateLayeredWindow`, blocks all input with low-level Windows hooks (`WH_KEYBOARD_LL`, `WH_MOUSE_LL`), and listens for the toggle shortcut via `RegisterHotKey`. Sleep is prevented with `SetThreadExecutionState`. No admin or compilation needed.
 
 On **Wayland**, the ghost uses a multi-layer approach:
 1. **C shared library** binds `zwp_keyboard_shortcuts_inhibit_manager_v1` to block compositor keyboard shortcuts

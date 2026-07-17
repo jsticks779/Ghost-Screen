@@ -1556,6 +1556,206 @@ class GtkGhostScreen(GhostScreen):
         scan_y = (t * 60) % self.sh
         draw.line([(0, scan_y), (self.sw, scan_y)], fill=col, width=1)
 
+# ─── Windows backend ────────────────────────────────────────────────────
+
+if sys.platform == "win32":
+    class WindowsGhostScreen(GhostScreen):
+        def __init__(self, cfg=None):
+            super().__init__(cfg)
+            self._backend = "windows"
+            self._hwnd = None
+            self._hotkey_id = 1
+            self._hook_ids = []
+            self._timer_id = 2
+            self._blocking = False
+            self._draw = None
+            signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
+
+            import win32api, win32con, win32gui, win32gui_struct
+            self._win32api = win32api
+            self._win32con = win32con
+            self._win32gui = win32gui
+
+            self._init_window()
+            self._register_hotkey()
+            self._install_hooks()
+            self._prevent_sleep()
+            self.particles = self._init_particles()
+            self._write_pid()
+
+        def _init_window(self):
+            wc = self._win32gui.WNDCLASS()
+            wc.lpfnWndProc = self._wndproc
+            wc.hInstance = self._win32api.GetModuleHandle(None)
+            wc.lpszClassName = "GhostScreenWin"
+            self._class = self._win32gui.RegisterClass(wc)
+
+            self.sw = self._win32api.GetSystemMetrics(self._win32con.SM_CXSCREEN)
+            self.sh = self._win32api.GetSystemMetrics(self._win32con.SM_CYSCREEN)
+
+            self._hwnd = self._win32gui.CreateWindowEx(
+                self._win32con.WS_EX_LAYERED | self._win32con.WS_EX_TOPMOST |
+                self._win32con.WS_EX_TRANSPARENT | self._win32con.WS_EX_TOOLWINDOW,
+                wc.lpszClassName, "Ghost Screen",
+                self._win32con.WS_POPUP,
+                0, 0, self.sw, self.sh, 0, 0, wc.hInstance, None)
+
+            self._win32gui.SetLayeredWindowAttributes(
+                self._hwnd, 0, int(255 * self.cfg["opacity"]),
+                self._win32con.LWA_ALPHA)
+
+            self._win32gui.ShowWindow(self._hwnd, self._win32con.SW_SHOW)
+            self._win32gui.UpdateWindow(self._hwnd)
+            self._win32gui.SetForegroundWindow(self._hwnd)
+
+        def _register_hotkey(self):
+            combo = _get_toggle_combo()
+            mods, key = parse_shortcut(combo)
+            mod_map = {"ctrl": self._win32con.MOD_CONTROL,
+                       "control": self._win32con.MOD_CONTROL,
+                       "alt": self._win32con.MOD_ALT,
+                       "shift": self._win32con.MOD_SHIFT,
+                       "super": self._win32con.MOD_WIN}
+            mask = 0
+            for m in mods:
+                g = mod_map.get(m.lower())
+                if g:
+                    mask |= g
+            vk = ord(key.upper()) if len(key) == 1 else 0
+            if not vk:
+                return
+            self._win32api.RegisterHotKey(self._hwnd, self._hotkey_id, mask, vk)
+
+        def _install_hooks(self):
+            import ctypes
+            user32 = ctypes.windll.user32
+            WH_KEYBOARD_LL = 13
+            WH_MOUSE_LL = 14
+
+            def kbd_proc(nCode, wParam, lParam):
+                if nCode >= 0 and wParam in (0x100, 0x101):
+                    return 1
+                return user32.CallNextHookEx(0, nCode, wParam, lParam)
+
+            def mouse_proc(nCode, wParam, lParam):
+                if nCode >= 0:
+                    return 1
+                return user32.CallNextHookEx(0, nCode, wParam, lParam)
+
+            self._kbd_hook = user32.SetWindowsHookExW(WH_KEYBOARD_LL, kbd_proc, 0, 0)
+            self._mouse_hook = user32.SetWindowsHookExW(WH_MOUSE_LL, mouse_proc, 0, 0)
+            self._blocking = True
+
+        def _uninstall_hooks(self):
+            import ctypes
+            user32 = ctypes.windll.user32
+            if getattr(self, '_kbd_hook', None):
+                user32.UnhookWindowsHookEx(self._kbd_hook)
+                self._kbd_hook = None
+            if getattr(self, '_mouse_hook', None):
+                user32.UnhookWindowsHookEx(self._mouse_hook)
+                self._mouse_hook = None
+            self._blocking = False
+
+        def _prevent_sleep(self):
+            self._win32api.SetThreadExecutionState(
+                self._win32con.ES_CONTINUOUS | self._win32con.ES_SYSTEM_REQUIRED |
+                self._win32con.ES_DISPLAY_REQUIRED)
+
+        def _restore_sleep(self):
+            self._win32api.SetThreadExecutionState(self._win32con.ES_CONTINUOUS)
+
+        def _wndproc(self, hwnd, msg, wparam, lparam):
+            if msg == self._win32con.WM_HOTKEY and wparam == self._hotkey_id:
+                self._toggle_off()
+                return 0
+            if msg == self._win32con.WM_DESTROY:
+                self._win32gui.PostQuitMessage(0)
+                return 0
+            if msg == self._win32con.WM_TIMER and wparam == self._timer_id:
+                self._render_frame()
+                return 0
+            return self._win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
+
+        def _toggle_off(self):
+            self._restore_sleep()
+            self._uninstall_hooks()
+            self._quit = True
+            if self._hwnd:
+                try:
+                    self._win32gui.DestroyWindow(self._hwnd)
+                except Exception:
+                    pass
+            self._cleanup_inhibition()
+            self._cleanup_pid()
+
+        def _signal_quit(self):
+            self._toggle_off()
+
+        def _render_frame(self):
+            if self._quit or not self._hwnd:
+                return
+            try:
+                from PIL import Image, ImageDraw
+                self._update()
+                t = self.time
+                c = self.cfg["colors"]
+                cx, cy = self.sw // 2, self.sh // 2
+                float_y = math.sin(t * 2) * self.cfg["float_amplitude"]
+                gy = cy + float_y
+                scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
+
+                img = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(img)
+                self._draw_vignette(draw, t, c)
+                self._draw_grid(draw, t, cx, cy, c["grid"])
+                self._draw_rings(draw, t, cx, gy, scale, c)
+                self._draw_ghost(draw, t, cx, gy, scale, c)
+                self._draw_particles(draw, t, c["particle"], c["primary"])
+                self._draw_hud(draw, t, cx, gy, scale, c["accent"])
+                self._display_frame(img)
+            except Exception:
+                pass
+
+        def _display_frame(self, img):
+            from PIL import ImageWin
+            import ctypes
+
+            hdc = self._win32gui.GetDC(0)
+            memdc = self._win32gui.CreateCompatibleDC(hdc)
+            dib = ImageWin.Dib(img)
+
+            dib.draw(memdc, (0, 0, self.sw, self.sh))
+
+            blend = ctypes.create_string_buffer(4)
+            blend[0] = 0
+            blend[1] = 0
+            blend[2] = 0xff
+            blend[3] = 1
+
+            self._win32gui.UpdateLayeredWindow(
+                self._hwnd, hdc, (0, 0), (self.sw, self.sh),
+                memdc, (0, 0), 0,
+                ctypes.cast(blend, ctypes.POINTER(ctypes.c_ubyte)),
+                self._win32con.ULW_ALPHA)
+
+            self._win32gui.DeleteDC(memdc)
+            self._win32gui.ReleaseDC(0, hdc)
+
+        def _cleanup_inhibition(self):
+            self._restore_sleep()
+
+        def run(self):
+            self._win32gui.SetTimer(self._hwnd, self._timer_id,
+                                     self.cfg["frame_delay"], None)
+            self._win32gui.PumpMessages()
+
+    # Reuse drawing methods from GtkGhostScreen
+    for _m in ['_draw_vignette', '_draw_grid', '_draw_rings',
+               '_draw_ghost', '_draw_particles', '_draw_hud']:
+        setattr(WindowsGhostScreen, _m, getattr(GtkGhostScreen, _m))
+
+
 # ─── Autostart ──────────────────────────────────────────────────────────
 
 AUTOSTART_DIR = os.path.expanduser("~/.config/autostart")
@@ -1655,6 +1855,19 @@ def _run_idle_watchdog(idle_minutes):
 # ─── Factory ───────────────────────────────────────────────────────────
 
 def create_ghost_screen(cfg=None):
+    if sys.platform == "win32":
+        try:
+            import win32gui
+            from PIL import Image
+            print("  Backend: Windows (pywin32 + Pillow)")
+            return WindowsGhostScreen(cfg)
+        except ImportError as e:
+            print(f"  Windows backend requires pywin32 + Pillow: pip install pywin32 pillow")
+            print(f"  ({e})")
+        except Exception as e:
+            print(f"  Windows backend failed ({e}).")
+        sys.exit(1)
+
     display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
     print(f"  Display server: {display_type}")
     if display_type == "wayland":
@@ -1672,6 +1885,27 @@ def create_ghost_screen(cfg=None):
 
 def check_deps():
     ok = True
+
+    if sys.platform == "win32":
+        try:
+            import win32gui
+            print(f"  [WIN]  pywin32:  OK")
+        except Exception as e:
+            print(f"  [WIN]  pywin32:  MISSING ({e})")
+            ok = False
+        try:
+            from PIL import Image
+            print(f"  [WIN]  Pillow:   OK  (PIL {Image.__version__})")
+        except ImportError:
+            print(f"  [WIN]  Pillow:   MISSING (install pillow)")
+            ok = False
+        print()
+        if ok:
+            print("\n  All dependencies satisfied.")
+        else:
+            print("\n  Some dependencies missing — run: pip install pywin32 pillow")
+        sys.exit(0 if ok else 1)
+
     display_type = os.environ.get("XDG_SESSION_TYPE", "x11")
 
     try:

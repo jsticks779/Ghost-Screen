@@ -1,4 +1,6 @@
-# Ghost Screen
+<p align="center">
+  <img src="logo.svg" alt="GHOSTSCREEN" width="580">
+</p>
 
 An animated tech ghost overlay for **any Linux desktop**. Toggle it on/off with
 Ctrl+3 for a cyberpunk holographic screensaver effect.

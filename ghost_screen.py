@@ -1679,6 +1679,7 @@ if sys.platform == "win32":
             self._user32.RegisterHotKey(self._hwnd, self._hotkey_id, mask, vk)
 
         def _make_kbd_proc(self):
+            import ctypes
             user32 = self._user32
             hwnd = self._hwnd
             VK_3 = 0x33

@@ -1617,6 +1617,41 @@ if sys.platform == "win32":
             self._user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
             self._user32.GetAsyncKeyState.restype = ctypes.c_short
 
+            self._user32.GetDC.argtypes = [wintypes.HWND]
+            self._user32.GetDC.restype = wintypes.HDC
+            self._user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+            self._user32.ReleaseDC.restype = ctypes.c_int
+
+            self._gdi32 = ctypes.windll.gdi32
+            self._gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+            self._gdi32.CreateCompatibleDC.restype = wintypes.HDC
+            self._gdi32.DeleteDC.argtypes = [wintypes.HDC]
+            self._gdi32.DeleteDC.restype = ctypes.c_bool
+
+            class POINT(ctypes.Structure):
+                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+            class SIZE(ctypes.Structure):
+                _fields_ = [("cx", ctypes.c_long), ("cy", ctypes.c_long)]
+            class BLENDFUNCTION(ctypes.Structure):
+                _fields_ = [
+                    ("BlendOp", ctypes.c_ubyte),
+                    ("BlendFlags", ctypes.c_ubyte),
+                    ("SourceConstantAlpha", ctypes.c_ubyte),
+                    ("AlphaFormat", ctypes.c_ubyte),
+                ]
+            self._POINT = POINT
+            self._SIZE = SIZE
+            self._BLENDFUNCTION = BLENDFUNCTION
+            self._ULW_ALPHA = 2
+
+            self._user32.UpdateLayeredWindow.argtypes = [
+                wintypes.HWND, wintypes.HDC,
+                ctypes.POINTER(POINT), ctypes.POINTER(SIZE),
+                wintypes.HDC, ctypes.POINTER(POINT),
+                ctypes.c_uint32,
+                ctypes.POINTER(BLENDFUNCTION), ctypes.c_uint32]
+            self._user32.UpdateLayeredWindow.restype = ctypes.c_bool
+
             self._kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
             self._kernel32.SetThreadExecutionState.restype = wintypes.DWORD
 
@@ -1743,14 +1778,14 @@ if sys.platform == "win32":
             self._sleep_inhibited = False
 
         def _wndproc(self, hwnd, msg, wparam, lparam):
-            if msg == self._win32con.WM_HOTKEY and wparam == self._hotkey_id:
+            if msg == 0x0312 and wparam == self._hotkey_id:
                 self._toggle_off()
                 return 0
-            if msg == self._win32con.WM_DESTROY:
+            if msg == 0x0002:
                 self._toggle_off()
                 self._win32gui.PostQuitMessage(0)
                 return 0
-            if msg == self._win32con.WM_TIMER and wparam == self._timer_id:
+            if msg == 0x0113 and wparam == self._timer_id:
                 self._render_frame()
                 return 0
             return self._win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
@@ -1797,28 +1832,23 @@ if sys.platform == "win32":
 
         def _display_frame(self, img):
             from PIL import ImageWin
-            import ctypes
 
-            hdc = self._win32gui.GetDC(0)
-            memdc = self._win32gui.CreateCompatibleDC(hdc)
+            hdc = self._user32.GetDC(0)
+            memdc = self._gdi32.CreateCompatibleDC(hdc)
             dib = ImageWin.Dib(img)
-
             dib.draw(memdc, (0, 0, self.sw, self.sh))
 
-            blend = ctypes.create_string_buffer(4)
-            blend[0] = 0
-            blend[1] = 0
-            blend[2] = 0xff
-            blend[3] = 1
+            blend = self._BLENDFUNCTION(0, 0, 0xff, 1)
+            pt_dst = self._POINT(0, 0)
+            sz = self._SIZE(self.sw, self.sh)
+            pt_src = self._POINT(0, 0)
 
-            self._win32gui.UpdateLayeredWindow(
-                self._hwnd, hdc, (0, 0), (self.sw, self.sh),
-                memdc, (0, 0), 0,
-                ctypes.cast(blend, ctypes.POINTER(ctypes.c_ubyte)),
-                self._win32con.ULW_ALPHA)
+            self._user32.UpdateLayeredWindow(
+                self._hwnd, hdc, pt_dst, sz,
+                memdc, pt_src, 0, blend, self._ULW_ALPHA)
 
-            self._win32gui.DeleteDC(memdc)
-            self._win32gui.ReleaseDC(0, hdc)
+            self._gdi32.DeleteDC(memdc)
+            self._user32.ReleaseDC(0, hdc)
 
         def _cleanup_inhibition(self):
             self._restore_sleep()

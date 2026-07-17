@@ -1601,9 +1601,9 @@ if sys.platform == "win32":
             self._user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 
             self._user32.SetTimer.argtypes = [
-                wintypes.HWND, wintypes.UINT_PTR, wintypes.UINT,
+                wintypes.HWND, ctypes.c_size_t, ctypes.c_uint,
                 ctypes.c_void_p]
-            self._user32.SetTimer.restype = wintypes.UINT_PTR
+            self._user32.SetTimer.restype = ctypes.c_size_t
 
             self._kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
             self._kernel32.SetThreadExecutionState.restype = wintypes.DWORD

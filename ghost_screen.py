@@ -1678,16 +1678,18 @@ if sys.platform == "win32":
             wc.hInstance = self._win32api.GetModuleHandle(None)
             wc.lpszClassName = "GhostScreenWin"
             self._class = self._win32gui.RegisterClass(wc)
+            self._write_sleep_log(f"RegisterClass done, atom={self._class}")
 
-            self.sw = self._win32api.GetSystemMetrics(self._win32con.SM_CXSCREEN)
-            self.sh = self._win32api.GetSystemMetrics(self._win32con.SM_CYSCREEN)
+            self.sw = self._win32api.GetSystemMetrics(0)
+            self.sh = self._win32api.GetSystemMetrics(1)
+            self._write_sleep_log(f"Screen size: {self.sw}x{self.sh}")
 
             self._hwnd = self._win32gui.CreateWindowEx(
-                self._win32con.WS_EX_LAYERED | self._win32con.WS_EX_TOPMOST |
-                self._win32con.WS_EX_TRANSPARENT | self._win32con.WS_EX_TOOLWINDOW,
+                0x80000 | 0x8 | 0x20 | 0x80,
                 wc.lpszClassName, "Ghost Screen",
-                self._win32con.WS_POPUP,
+                0x80000000,
                 0, 0, self.sw, self.sh, 0, 0, wc.hInstance, None)
+            self._write_sleep_log(f"CreateWindowEx returned hwnd={self._hwnd}")
 
             if not self._hwnd:
                 raise RuntimeError("CreateWindowEx returned NULL")
@@ -1695,9 +1697,10 @@ if sys.platform == "win32":
             self._win32gui.ShowWindow(self._hwnd, 4)
             self._win32gui.UpdateWindow(self._hwnd)
             from PIL import Image
-            blank = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
+            blank = Image.new("RGBA", (self.sw, self.sh), (5, 5, 16, 255))
             self._display_frame(blank)
             self._win32gui.SetForegroundWindow(self._hwnd)
+            self._write_sleep_log("Window initialized")
 
         def _register_hotkey(self):
             combo = _get_toggle_combo()

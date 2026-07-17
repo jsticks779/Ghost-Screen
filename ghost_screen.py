@@ -1819,46 +1819,8 @@ if sys.platform == "win32":
                 except Exception:
                     pass
 
-        def _block_touch(self):
-            import ctypes
-            from ctypes import wintypes
-            hwnd = self._root.winfo_id()
-            user32 = self._user32
-            WM_TOUCH = 0x0240
-            WM_GESTURE = 0x0119
-            WM_POINTERDOWN = 0x0246
-            WM_POINTERUP = 0x0247
-            WM_POINTERUPDATE = 0x0245
-            GESTURE_BLOCK = (WM_TOUCH, WM_GESTURE,
-                             WM_POINTERDOWN, WM_POINTERUP, WM_POINTERUPDATE)
-
-            WNDPROC = ctypes.WINFUNCTYPE(
-                wintypes.LPARAM,
-                wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
-
-            user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
-            user32.GetWindowLongPtrW.restype = wintypes.LPARAM
-            user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LPARAM]
-            user32.SetWindowLongPtrW.restype = wintypes.LPARAM
-            user32.CallWindowProcW.argtypes = [
-                wintypes.LPARAM, wintypes.HWND, wintypes.UINT,
-                wintypes.WPARAM, wintypes.LPARAM]
-            user32.CallWindowProcW.restype = wintypes.LPARAM
-
-            orig_proc = user32.GetWindowLongPtrW(hwnd, -4)
-            def wnd_proc(hWnd, msg, wParam, lParam):
-                if msg in GESTURE_BLOCK:
-                    return 0
-                return user32.CallWindowProcW(orig_proc, hWnd, msg, wParam, lParam)
-            new_proc = WNDPROC(wnd_proc)
-            user32.SetWindowLongPtrW(hwnd, -4,
-                ctypes.cast(new_proc, ctypes.c_void_p).value)
-            self._orig_wndproc = orig_proc
-            self._new_wndproc = new_proc
-
         def run(self):
             self._create_window()
-            self._block_touch()
             while not self._quit:
                 try:
                     self._root.mainloop()

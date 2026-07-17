@@ -1649,7 +1649,11 @@ if sys.platform == "win32":
                             ctrl_down = True
                             return 1
                         if kb.vkCode == VK_3 and ctrl_down:
-                            app._toggle_off()
+                            if app._root:
+                                try:
+                                    app._root.after(0, app._toggle_off)
+                                except Exception:
+                                    pass
                             return 1
                         return 1
                     if wParam in (WM_KEYUP, WM_SYSKEYUP):
@@ -1695,7 +1699,11 @@ if sys.platform == "win32":
                         if kb.vkCode in CTRL_KEYS:
                             ctrl_down = True
                         elif kb.vkCode == VK_3 and ctrl_down:
-                            app._toggle_on()
+                            if app._root:
+                                try:
+                                    app._root.after(0, app._toggle_on)
+                                except Exception:
+                                    pass
                             return 1
                     elif wParam in (WM_KEYUP, WM_SYSKEYUP):
                         if kb.vkCode in CTRL_KEYS:
@@ -1761,6 +1769,13 @@ if sys.platform == "win32":
         def _signal_quit(self):
             self._restore_sleep()
             self._uninstall_all_hooks()
+            if self._root:
+                try:
+                    self._root.after(0, self._do_quit)
+                except Exception:
+                    pass
+
+        def _do_quit(self):
             self._quit = True
             if self._root:
                 try:

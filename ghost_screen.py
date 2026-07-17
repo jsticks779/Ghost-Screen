@@ -1572,9 +1572,15 @@ if sys.platform == "win32":
             signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
 
             import win32api, win32con, win32gui, win32gui_struct
+            import ctypes
+            from ctypes import wintypes
             self._win32api = win32api
             self._win32con = win32con
             self._win32gui = win32gui
+            self._user32 = ctypes.windll.user32
+
+            HOOKPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+            self._HOOKPROC = HOOKPROC
 
             self._init_window()
             self._register_hotkey()
@@ -1609,8 +1615,6 @@ if sys.platform == "win32":
             self._win32gui.SetForegroundWindow(self._hwnd)
 
         def _register_hotkey(self):
-            import ctypes
-            user32 = ctypes.windll.user32
             combo = _get_toggle_combo()
             mods, key = parse_shortcut(combo)
             mod_map = {"ctrl": 0x0002, "control": 0x0002,
@@ -1624,37 +1628,44 @@ if sys.platform == "win32":
             vk = ord(key.upper()) if len(key) == 1 else 0
             if not vk:
                 return
-            user32.RegisterHotKey(self._hwnd, self._hotkey_id, mask, vk)
+            self._user32.RegisterHotKey(self._hwnd, self._hotkey_id, mask, vk)
 
-        def _install_hooks(self):
-            import ctypes
-            user32 = ctypes.windll.user32
-            WH_KEYBOARD_LL = 13
-            WH_MOUSE_LL = 14
-
+        def _make_kbd_proc(self):
+            user32 = self._user32
             def kbd_proc(nCode, wParam, lParam):
                 if nCode >= 0 and wParam in (0x100, 0x101):
                     return 1
                 return user32.CallNextHookEx(0, nCode, wParam, lParam)
+            return self._HOOKPROC(kbd_proc)
 
+        def _make_mouse_proc(self):
+            user32 = self._user32
             def mouse_proc(nCode, wParam, lParam):
                 if nCode >= 0:
                     return 1
                 return user32.CallNextHookEx(0, nCode, wParam, lParam)
+            return self._HOOKPROC(mouse_proc)
 
-            self._kbd_hook = user32.SetWindowsHookExW(WH_KEYBOARD_LL, kbd_proc, 0, 0)
-            self._mouse_hook = user32.SetWindowsHookExW(WH_MOUSE_LL, mouse_proc, 0, 0)
+        def _install_hooks(self):
+            WH_KEYBOARD_LL = 13
+            WH_MOUSE_LL = 14
+            self._kbd_cb = self._make_kbd_proc()
+            self._mouse_cb = self._make_mouse_proc()
+            self._kbd_hook = self._user32.SetWindowsHookExW(
+                WH_KEYBOARD_LL, self._kbd_cb, 0, 0)
+            self._mouse_hook = self._user32.SetWindowsHookExW(
+                WH_MOUSE_LL, self._mouse_cb, 0, 0)
             self._blocking = True
 
         def _uninstall_hooks(self):
-            import ctypes
-            user32 = ctypes.windll.user32
             if getattr(self, '_kbd_hook', None):
-                user32.UnhookWindowsHookEx(self._kbd_hook)
+                self._user32.UnhookWindowsHookEx(self._kbd_hook)
                 self._kbd_hook = None
             if getattr(self, '_mouse_hook', None):
-                user32.UnhookWindowsHookEx(self._mouse_hook)
+                self._user32.UnhookWindowsHookEx(self._mouse_hook)
                 self._mouse_hook = None
+            self._kbd_cb = None
+            self._mouse_cb = None
             self._blocking = False
 
         def _prevent_sleep(self):

@@ -1616,6 +1616,9 @@ if sys.platform == "win32":
             user32 = self._user32
             VK_3 = 0x33
             VK_CONTROL = 0x11
+            VK_LCONTROL = 0xA2
+            VK_RCONTROL = 0xA3
+            CTRL_KEYS = (VK_CONTROL, VK_LCONTROL, VK_RCONTROL)
             WM_KEYDOWN = 0x100
             WM_KEYUP = 0x101
             WM_SYSKEYDOWN = 0x104
@@ -1630,25 +1633,12 @@ if sys.platform == "win32":
                     ("time", ctypes.c_uint32),
                     ("dwExtraInfo", ctypes.c_size_t),
                 ]
-            import atexit
-            _debug_log = None
-            try:
-                _debug_log = open(
-                    os.path.join(tempfile.gettempdir(), "ghost_kbd_hook.log"),
-                    "w", buffering=1)
-                atexit.register(_debug_log.close)
-            except Exception:
-                pass
-
             def kbd_proc(nCode, wParam, lParam):
                 nonlocal ctrl_down
                 if nCode >= 0:
                     kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-                    if _debug_log:
-                        _debug_log.write(
-                            f"msg={wParam:#x} vk={kb.vkCode:#x} ctrl={ctrl_down}\n")
                     if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
-                        if kb.vkCode == VK_CONTROL:
+                        if kb.vkCode in CTRL_KEYS:
                             ctrl_down = True
                             return 1
                         if kb.vkCode == VK_3 and ctrl_down:
@@ -1674,7 +1664,7 @@ if sys.platform == "win32":
                             return 1
                         return 1
                     if wParam in (WM_KEYUP, WM_SYSKEYUP):
-                        if kb.vkCode == VK_CONTROL:
+                        if kb.vkCode in CTRL_KEYS:
                             ctrl_down = False
                         return 1
                 return user32.CallNextHookEx(0, nCode, wParam, lParam)

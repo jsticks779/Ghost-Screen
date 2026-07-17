@@ -8,7 +8,7 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 - Full-screen animated tech ghost with rotating geometric core
 - Circuit trace patterns, floating particles, scan lines, HUD brackets
 - Toggle on/off — same shortcut or command
-- **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/Deepin/LXQt)
+- **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/COSMIC/Deepin/LXQt)
 - **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
 - **Survives sleep/wake** — window auto-restarts after suspend on both backends
 - **Blocks PC sleep** while ghost is active — toggle off to allow sleep
@@ -61,6 +61,7 @@ The install script auto-detects **everything**:
 | **Sway** | Appends to `~/.config/sway/config` |
 | **Hyprland** | Appends to `~/.config/hypr/hyprland.conf` |
 | **River** | Appends to `~/.config/river/init` |
+| **COSMIC** | Detected; `--shortcut` not yet supported (set manually) |
 | **Deepin** | `gsettings` |
 | **LXQt** | Appends to `~/.config/lxqt/globalkeyshortcuts.conf` |
 | **Other X11** | `xbindkeys` universal fallback |
@@ -87,8 +88,10 @@ The **only** way to dismiss the ghost is pressing your shortcut again (toggle of
 ### Sleep / suspend behavior
 
 While the ghost is active, **PC sleep is blocked** automatically (via
-`systemd-inhibit`). The ghost survives suspend/resume on both backends — if the
-window is destroyed during sleep, the process detects it and recreates it.
+D-Bus `org.freedesktop.login1.Manager.Inhibit`, with `systemd-inhibit`
+CLI fallback). The ghost survives suspend/resume on both backends — if
+the window is destroyed during sleep, the process detects it and recreates
+it.
 
 ## Keyboard Shortcut
 
@@ -107,6 +110,7 @@ you lifting a finger. It persists across reboots.
 | **Sway**             | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
 | **Hyprland**         | Add `bind = Ctrl, 3, exec, ~/.local/bin/ghost-screen` to config |
 | **River**            | Add `riverctl map normal Ctrl 3 spawn ~/.local/bin/ghost-screen &` to config |
+| **COSMIC**           | Settings → Keyboard → Shortcuts → + → set to `~/.local/bin/ghost-screen` |
 | **Deepin**           | Settings → Keyboard → Shortcuts → + → same as GNOME |
 | **LXQt**             | Add to `~/.config/lxqt/globalkeyshortcuts.conf` or use GUI |
 | **Any**              | Use your DE/WM's custom shortcut feature with command `~/.local/bin/ghost-screen` |
@@ -225,9 +229,10 @@ displayed — running the script again kills the existing instance (toggle
 behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.
 Only the shortcut toggles it off — no click or Escape.
 
-The script acquires a `systemd-inhibit` sleep lock (mode=block) while the
-ghost is active, preventing the PC from suspending. The lock is released
-automatically on toggle-off or `--kill`.
+The script acquires a sleep lock (D-Bus `org.freedesktop.login1.Manager.Inhibit`,
+with `systemd-inhibit` CLI fallback) while the ghost is active, preventing the
+PC from suspending. The lock is released automatically on toggle-off or
+`--kill`.
 
 ## License
 

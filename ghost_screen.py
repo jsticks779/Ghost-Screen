@@ -115,6 +115,42 @@ def merge_config(cfg):
             merged["colors"].update(v)
         else:
             merged[k] = v
+
+    opacity = merged.get("opacity", 0.88)
+    if not isinstance(opacity, (int, float)):
+        opacity = 0.88
+    merged["opacity"] = max(0.0, min(1.0, float(opacity)))
+
+    frame_delay = merged.get("frame_delay", 33)
+    if not isinstance(frame_delay, (int, float)):
+        frame_delay = 33
+    merged["frame_delay"] = max(16, min(500, int(frame_delay)))
+
+    particle_count = merged.get("particle_count", 60)
+    if not isinstance(particle_count, int):
+        particle_count = 60
+    merged["particle_count"] = max(1, min(500, particle_count))
+
+    ghost_scale = merged.get("ghost_scale", 0.28)
+    if not isinstance(ghost_scale, (int, float)):
+        ghost_scale = 0.28
+    merged["ghost_scale"] = max(0.05, min(1.0, float(ghost_scale)))
+
+    float_amplitude = merged.get("float_amplitude", 30)
+    if not isinstance(float_amplitude, (int, float)):
+        float_amplitude = 30
+    merged["float_amplitude"] = max(0, min(500, int(float_amplitude)))
+
+    float_speed = merged.get("float_speed", 0.035)
+    if not isinstance(float_speed, (int, float)):
+        float_speed = 0.035
+    merged["float_speed"] = max(0.0, min(2.0, float(float_speed)))
+
+    rotation_speed = merged.get("rotation_speed", 0.02)
+    if not isinstance(rotation_speed, (int, float)):
+        rotation_speed = 0.02
+    merged["rotation_speed"] = max(0.0, min(1.0, float(rotation_speed)))
+
     return merged
 
 
@@ -1131,7 +1167,11 @@ class GtkGhostScreen(GhostScreen):
         from gi.repository import Gdk
         if event.type == Gdk.EventType.KEY_PRESS:
             if event.keyval == self._toggle_keyval:
-                state = event.state & Gdk.ModifierType.MODIFIER_MASK
+                RELEVANT = (Gdk.ModifierType.CONTROL_MASK |
+                            Gdk.ModifierType.MOD1_MASK |
+                            Gdk.ModifierType.SHIFT_MASK |
+                            Gdk.ModifierType.SUPER_MASK)
+                state = event.state & RELEVANT
                 if state == self._toggle_mods:
                     self._toggle_off()
                     return True
@@ -1139,7 +1179,6 @@ class GtkGhostScreen(GhostScreen):
 
     def _toggle_off(self):
         self._cleanup_inhibition()
-        self._cleanup_pid()
         self._quit = True
 
     def _on_window_destroy(self, *args):

@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -38,19 +39,27 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Verify it's a device (not a symlink trick)
-    struct stat st;
-    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
-        fprintf(stderr, "Invalid device path\n");
+    // Atomic open with O_NOFOLLOW prevents symlink-race TOCTOU
+    int fd = open(path, O_WRONLY | O_NOFOLLOW);
+    if (fd < 0) {
+        perror("open");
         return 1;
     }
 
-    FILE *f = fopen(path, "w");
-    if (!f) {
-        perror("fopen");
+    // Verify it's a regular file (defense-in-depth — O_NOFOLLOW already
+    // prevents symlink escalation, but check anyway)
+    struct stat st;
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        fprintf(stderr, "Invalid device path\n");
+        close(fd);
         return 1;
     }
-    fprintf(f, "%s", argv[2]);
-    fclose(f);
+
+    if (write(fd, argv[2], strlen(argv[2])) < 0) {
+        perror("write");
+        close(fd);
+        return 1;
+    }
+    close(fd);
     return 0;
 }

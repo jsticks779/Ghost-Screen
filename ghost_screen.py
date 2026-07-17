@@ -1609,13 +1609,13 @@ if sys.platform == "win32":
             self._win32gui.SetForegroundWindow(self._hwnd)
 
         def _register_hotkey(self):
+            import ctypes
+            user32 = ctypes.windll.user32
             combo = _get_toggle_combo()
             mods, key = parse_shortcut(combo)
-            mod_map = {"ctrl": self._win32con.MOD_CONTROL,
-                       "control": self._win32con.MOD_CONTROL,
-                       "alt": self._win32con.MOD_ALT,
-                       "shift": self._win32con.MOD_SHIFT,
-                       "super": self._win32con.MOD_WIN}
+            mod_map = {"ctrl": 0x0002, "control": 0x0002,
+                       "alt": 0x0001, "shift": 0x0004,
+                       "super": 0x0008}
             mask = 0
             for m in mods:
                 g = mod_map.get(m.lower())
@@ -1624,7 +1624,7 @@ if sys.platform == "win32":
             vk = ord(key.upper()) if len(key) == 1 else 0
             if not vk:
                 return
-            self._win32api.RegisterHotKey(self._hwnd, self._hotkey_id, mask, vk)
+            user32.RegisterHotKey(self._hwnd, self._hotkey_id, mask, vk)
 
         def _install_hooks(self):
             import ctypes

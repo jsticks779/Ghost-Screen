@@ -2,188 +2,118 @@
   <img src="logo.svg" alt="GHOSTSCREEN" width="580">
 </p>
 
-An animated tech ghost overlay for **Linux & Windows**. Toggle it on/off with
-Ctrl+3 for a cyberpunk holographic screensaver effect.
+<p align="center">
+  An animated tech ghost overlay for <strong>Linux & Windows</strong>.<br>
+  Toggle on/off with <kbd>Ctrl</kbd>+<kbd>3</kbd> for a cyberpunk holographic screensaver effect.
+</p>
 
 ## Features
 
 - Full-screen animated tech ghost with rotating geometric core
 - Circuit trace patterns, floating particles, scan lines, HUD brackets
-- Toggle on/off — same shortcut or command
 - **Cross-platform** — Linux (X11, Wayland) + Windows
-- **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/COSMIC/Deepin/LXQt)
-- **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
-- **Survives sleep/wake** — window auto-restarts after suspend on all backends
-- **Blocks PC sleep + screen blanking** while ghost is active — toggle off to allow sleep
-- Auto-darkens on all platforms with an overlay window
+- **Works on every Linux compositor** — GNOME, KDE, XFCE, Sway, Hyprland, River, COSMIC, Deepin, LXQt
+- **Full input blocking** while active — keyboard, mouse, touch — on every platform
+- **Blocks sleep + screen blanking** — toggle off to allow sleep
+- Survives sleep/wake — window auto-restarts on all backends
 - Customizable colors, opacity, speed, and particle count
-- Dark semi-transparent overlay over your desktop
-- **Full input blocking** while ghost is active — keyboard, mouse, touchpad — on **every platform**
 
-## Requirements
-
-- **Python 3** — deps installed automatically
-
-| Platform | Backend          | Required Packages                              |
-|----------|------------------|-------------------------------------------------|
-| Linux X11 | tkinter         | `python3-tk`                                   |
-| Linux Wayland | GTK3 + Pillow | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
-| Linux Wayland (inhibitor) | C shared library | `gcc`, `pkg-config`, `wayland-scanner` (auto-built) |
-| **Windows** | **pywin32 + Pillow** | `pip install pywin32 pillow` (auto-installed) |
-
-## Installation (one command — fully automatic)
-
-Choose your platform and method:
+## Installation
 
 ### Linux
 
-**curl** (recommended):
 ```bash
+# Recommended — one command
 curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.sh | bash
-```
 
-**npm**:
-```bash
+# Or via npm
 npm install -g ghost-screen
-```
 
-**git clone**:
-```bash
+# Or via git
 git clone https://github.com/jsticks779/Ghost-Screen.git
 cd Ghost-Screen
 ./install.sh
 ```
 
-**You'll be prompted for `sudo`** — the script needs it to install system
-packages and set up the SUID helper for input blocking. Full install takes
-~20 seconds.
+> You'll be prompted for `sudo` — needed for system packages and input blocking. Takes ~20 seconds.
 
 ### Windows
 
-**Run PowerShell as Administrator**, then paste:
+Open **PowerShell as Administrator** and paste:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1'))
 ```
 
-Or install manually in any terminal:
+Or install manually:
+
 ```powershell
 pip install pywin32 pillow
 curl -fsSL -o ghost_screen.py https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/ghost_screen.py
 python ghost_screen.py
 ```
 
-The install script auto-detects **everything**:
+---
 
-| What | How it's detected |
-|------|-------------------|
-| **Root vs user** | Installs to `/usr/local/bin` (root) or `~/.local/bin` (user) |
-| **Package manager** | `apt` / `pacman` / `dnf` / `zypper` / `apk` / `xbps` |
-| **Display server** | `XDG_SESSION_TYPE` — X11 or Wayland |
-| **Desktop environment** | `XDG_CURRENT_DESKTOP` — GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin, LXQt |
-| **Shell config** | Adds `PATH` to `.bashrc`, `.zshrc`, `.profile` |
-| **Pillow fallback** | If system package missing → tries `pip3 install Pillow` |
+| Platform | Backend | Required Packages |
+|----------|---------|-------------------|
+| Linux X11 | `tkinter` | `python3-tk` |
+| Linux Wayland | GTK3 + Pillow | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
+| Windows | `pywin32` + Pillow | `pip install pywin32 pillow` (auto) |
 
-### Shortcut auto-registration:
-
-| Desktop       | Method |
-|---------------|--------|
-| **GNOME** / Budgie / Cinnamon / MATE | `gsettings` |
-| **KDE Plasma** | `kwriteconfig5` + `qdbus` |
-| **XFCE** | `xfconf-query` |
-| **Sway** | Appends to `~/.config/sway/config` |
-| **Hyprland** | Appends to `~/.config/hypr/hyprland.conf` |
-| **River** | Appends to `~/.config/river/init` |
-| **COSMIC** | Detected; `--shortcut` not yet supported (set manually) |
-| **Deepin** | `gsettings` |
-| **LXQt** | Appends to `~/.config/lxqt/globalkeyshortcuts.conf` |
-| **Other X11** | `xbindkeys` universal fallback |
-| **Other Wayland** | Best-effort; manual setup if needed |
-
-After running it, **Ctrl+3** works immediately — no Settings menu needed.
-
-> **Note:** Manual install is **not recommended** — the C helpers (`wl_inhibit.so`,
-> `ghost-touch-inhibit`) must be compiled and SUID must be set, else keyboard
-> shortcuts and touch input won't be blocked. Always use `./install.sh`.
+After installing, press **Ctrl+3** to toggle the ghost on/off.
 
 ## Usage
 
-```bash
-ghost-screen                         # toggle on/off
-ghost-screen --kill                  # force stop
-ghost-screen --version               # show version
-ghost-screen --check                 # verify dependencies
-ghost-screen --shortcut "COMBO"      # change keyboard shortcut
-ghost-screen --autostart enable      # launch on login
-ghost-screen --autostart disable     # remove from autostart
-ghost-screen --autostart status      # check autostart status
-ghost-screen --idle 10               # activate after 10min idle (screensaver mode)
+```
+ghost-screen                         toggle on/off
+ghost-screen --kill                  force stop
+ghost-screen --version               show version
+ghost-screen --check                 verify dependencies
+ghost-screen --shortcut "COMBO"      change keyboard shortcut
+ghost-screen --autostart enable      launch on login
+ghost-screen --autostart disable     remove from autostart
+ghost-screen --autostart status      check autostart status
+ghost-screen --idle 10               screensaver mode (activate after 10min idle)
 ```
 
-The **only** way to dismiss the ghost is pressing your shortcut again (toggle off).
+The **only** way to dismiss the ghost is pressing your shortcut again.
 
-### Sleep / suspend behavior
+### Sleep behavior
 
-While the ghost is active, **PC sleep + screen blanking are blocked**
-automatically:
+While active, sleep + screen blanking are blocked automatically:
 
 - **Windows**: `SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)`
-- **Linux**: multi-backend inhibitor — logind D-Bus → GNOME Session Manager →
-  freedesktop PowerManagement → `systemd-inhibit` CLI fallback
+- **Linux**: multi-backend — logind D-Bus → GNOME Session Manager → freedesktop PowerManagement → `systemd-inhibit` CLI
 
-All locks are released on toggle-off or `--kill`. The ghost survives
-suspend/resume — if the window is destroyed during sleep, the process
-detects it and recreates it.
+All locks release on toggle-off or `--kill`.
 
 ## Keyboard Shortcut
 
-### Ctrl+3 is set automatically — any desktop
-
-The install script detects your environment and registers **Ctrl+3** without
-you lifting a finger. It persists across reboots.
-
-### Manual setup (if needed)
-
-| DE/WM                | Steps |
-|----------------------|-------|
-| **GNOME**            | Settings → Keyboard → Shortcuts → + → Name: `Ghost Screen` → Command: `~/.local/bin/ghost-screen` → Set Shortcut: Ctrl+3 |
-| **KDE**              | System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL → set to `~/.local/bin/ghost-screen` |
-| **XFCE**             | Settings → Keyboard → Application Shortcuts → Add → `~/.local/bin/ghost-screen` |
-| **Sway**             | Add `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` to config |
-| **Hyprland**         | Add `bind = Ctrl, 3, exec, ~/.local/bin/ghost-screen` to config |
-| **River**            | Add `riverctl map normal Ctrl 3 spawn ~/.local/bin/ghost-screen &` to config |
-| **COSMIC**           | Settings → Keyboard → Shortcuts → + → set to `~/.local/bin/ghost-screen` |
-| **Deepin**           | Settings → Keyboard → Shortcuts → + → same as GNOME |
-| **LXQt**             | Add to `~/.config/lxqt/globalkeyshortcuts.conf` or use GUI |
-| **Any**              | Use your DE/WM's custom shortcut feature with command `~/.local/bin/ghost-screen` |
-
-### Change shortcut any time — no reinstall needed
-
-After installing, your shortcut is **Ctrl+3** by default. To pick your own:
+**Ctrl+3** is registered automatically during install. To change it:
 
 ```bash
 ghost-screen --shortcut "Ctrl+Shift+G"
 ghost-screen --shortcut "Super+F1"
-ghost-screen --shortcut "Ctrl+Alt+T"
 ```
 
-**How it works:**
+The change persists across reboots. Works on GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin, LXQt.
 
-1. Run `ghost-screen --shortcut "Ctrl+Shift+G"`
-2. The script detects your desktop environment (GNOME, KDE, XFCE, etc.)
-3. It translates `Ctrl+Shift+G` into the format your DE expects
-   (e.g. GNOME → `<Control><Shift>g`, Sway → `Ctrl+Shift+g`)
-4. It finds your existing Ghost Screen shortcut and updates its key binding
-   — or creates a new entry if none exists
-5. The new combo is saved to `~/.config/ghost-screen/shortcut.json`
+### Manual setup per desktop
 
-The change is immediate and persists across reboots. No menus, no re-running
-the installer. Works on GNOME, KDE, XFCE, Sway, Hyprland, River, Deepin,
-LXQt, and falls back to xbindkeys on other X11 desktops.
+| Desktop | Steps |
+|---------|-------|
+| **GNOME** | Settings → Keyboard → Shortcuts → + → Name: `Ghost Screen` → Command: `~/.local/bin/ghost-screen` → Ctrl+3 |
+| **KDE** | System Settings → Shortcuts → Custom Shortcuts → Edit → New → Global Shortcut → Command/URL → `~/.local/bin/ghost-screen` |
+| **XFCE** | Settings → Keyboard → Application Shortcuts → Add → `~/.local/bin/ghost-screen` |
+| **Sway** | `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` |
+| **Hyprland** | `bind = Ctrl, 3, exec, ~/.local/bin/ghost-screen` |
+| **River** | `riverctl map normal Ctrl 3 spawn "~/.local/bin/ghost-screen" &` |
+| **Windows** | Shortcut is handled internally via `RegisterHotKey` — no desktop setup needed |
 
 ## Customization
 
-Create a `ghost_screen.json` file next to the script:
+Create `ghost_screen.json` next to the script or in `~/.config/ghost-screen/`:
 
 ```json
 {
@@ -205,98 +135,49 @@ Create a `ghost_screen.json` file next to the script:
 }
 ```
 
-| Option           | Description                           | Default |
-|------------------|---------------------------------------|---------|
-| `opacity`        | Window opacity (0–1)                 | 0.88    |
-| `frame_delay`    | ms per frame (lower = faster)        | 33      |
-| `particle_count` | Number of particles                  | 60      |
-| `ghost_scale`    | Ghost size (fraction of screen)      | 0.28    |
-| `float_amplitude`| Float motion (pixels)                | 30      |
-| `rotation_speed` | Core rotation speed                  | 0.02    |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `opacity` | Window opacity (0–1) | 0.88 |
+| `frame_delay` | ms per frame (lower = faster) | 33 |
+| `particle_count` | Number of particles | 60 |
+| `ghost_scale` | Ghost size (fraction of screen) | 0.28 |
+| `float_amplitude` | Float motion (pixels) | 30 |
+| `rotation_speed` | Core rotation speed | 0.02 |
 
 ## Uninstall
 
 ### Linux
 
 ```bash
-# If installed via curl
 curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/uninstall.sh | bash
-
-# If installed via npm
-npm uninstall -g ghost-screen
-
-# If installed via git clone
-cd Ghost-Screen
-./uninstall.sh
+npm uninstall -g ghost-screen   # if installed via npm
 ```
-
-All methods remove the binary (from `/usr/local/bin` and `~/.local/bin`),
-desktop entry, **and clean up the Ctrl+3 shortcut**.
 
 ### Windows
 
 ```powershell
-pip uninstall pywin32 pillow -y
 Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
 ```
-
-Or do it manually:
-
-```bash
-ghost-screen --kill
-rm -f ~/.local/bin/ghost-screen
-rm -f ~/.local/share/applications/ghost-screen.desktop
-```
-
-Remove the keyboard shortcut in **Settings → Keyboard → Shortcuts** if
-`uninstall.sh` didn't catch it.
 
 ## How It Works
 
 `ghost_screen.py` auto-detects your platform and picks the right backend:
 
-- **Windows** → `pywin32` layered window with per-pixel alpha, renders each
-  frame with Pillow, displayed via `UpdateLayeredWindow` — input blocked
-  with low-level keyboard/mouse hooks, toggle via `RegisterHotKey`
-- **Wayland** → GTK3 window with RGBA visual, renders each frame with Pillow,
-  converts to `GdkPixbuf`, displays on a `Gtk.Image` — fully transparent
-  background with no Cairo GI dependency
-- **X11** → tkinter window with `-alpha` for transparency, draws with the
-  tkinter canvas API
+| Platform | Backend | Window | Input Blocking | Sleep Lock |
+|----------|---------|--------|----------------|------------|
+| **Windows** | `pywin32` + Pillow | Layered transparent (`UpdateLayeredWindow`) | `WH_KEYBOARD_LL` / `WH_MOUSE_LL` hooks | `SetThreadExecutionState` |
+| **Linux (Wayland)** | GTK3 + Pillow | RGBA visual → GdkPixbuf | `zwp_keyboard_shortcuts_inhibit` + seat grab + kernel sysfs | D-Bus logind → systemd-inhibit |
+| **Linux (X11)** | `tkinter` | Fullscreen `-alpha` canvas | `grab_set_global()` | D-Bus logind → systemd-inhibit |
 
-Both backends **auto-restart the window** if it's destroyed (suspend, screen
-lock, display reconfig). The process stays alive until explicitly killed with
-`--kill` or the toggle shortcut.
+All backends render the same cyberpunk ghost animation:
 
-**Input is blocked while the ghost is active.** You cannot click, type,
-touch the screen, or interact with anything underneath. The toggle shortcut
-is detected internally (no compositor shortcut needed to dismiss).
+1. **Ghost silhouette** — polygon outline with circuit trace paths
+2. **Rotating core** — octagonal geometric center with pulsing eyes
+3. **Particles** — floating embers with twinkle effect
+4. **HUD overlay** — corner brackets, scan lines, animated grid
+5. **Vignette** — dark edges for depth
 
-| Backend | Mechanism | Blocks |
-|---------|-----------|--------|
-| **Windows (pywin32)** | Low-level `WH_KEYBOARD_LL` + `WH_MOUSE_LL` hooks | Keyboard, mouse, touch — **all input** |
-| **Tkinter (X11)** | `grab_set_global()` — X11 global grab | Everything, including WM key bindings |
-| **GTK3 (Wayland, keyboard)** | `zwp_keyboard_shortcuts_inhibit_manager_v1` via C `.so` | Super key, Alt+Tab, all compositor keyboard shortcuts |
-| **GTK3 (Wayland, touch devices)** | SUID C helper inhibits kernel `input` device (`inhibited` sysfs) | Touchpad + touchscreen gestures, scroll, tap, cursor — **every Linux** |
-| **GTK3 (Wayland, client)** | `Gdk.Seat.grab()` seat grab | Mouse clicks, keyboard typing, pointer motion |
-
-On **Windows**, the ghost uses a layered transparent window via `pywin32` + `UpdateLayeredWindow`, blocks all input with low-level Windows hooks (`WH_KEYBOARD_LL`, `WH_MOUSE_LL`), and listens for the toggle shortcut via `RegisterHotKey`. Sleep is prevented with `SetThreadExecutionState`. No admin or compilation needed.
-
-On **Wayland**, the ghost uses a multi-layer approach:
-1. **C shared library** binds `zwp_keyboard_shortcuts_inhibit_manager_v1` to block compositor keyboard shortcuts
-2. **SUID C helper** inhibits all touch input devices at the kernel-level via sysfs (`/sys/class/input/eventN/device/inhibited`) — works on **any Wayland compositor**, not DE-specific
-3. **Gdk.Seat.grab** + event handlers capture all client-level input (keyboard, mouse, touch)
-
-A **PID file** (`/tmp/ghost_screen.pid`) tracks whether the ghost is already
-displayed — running the script again kills the existing instance (toggle
-behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.
-Only the shortcut toggles it off — no click or Escape.
-
-The script acquires a sleep + idle lock while the ghost is active, preventing
-the PC from suspending or the screen from blanking. Three backends are tried
-in order (logind → GNOME Session → freedesktop PowerManagement), with a
-`systemd-inhibit` CLI fallback. All locks are released automatically on
-toggle-off or `--kill`.
+A **PID file** (`/tmp/ghost_screen.pid` on Linux, `$env:TEMP\ghost_screen.pid` on Windows) tracks whether the ghost is running — invoking the command again toggles it off. Only the toggle shortcut dismisses it — no click, no Escape.
 
 ## License
 

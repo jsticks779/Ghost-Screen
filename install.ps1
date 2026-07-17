@@ -1,6 +1,7 @@
 param()
 
-$REPO = "https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main"
+$OWNER = "jsticks779"
+$REPO_NAME = "Ghost-Screen"
 $SCRIPT_NAME = "ghost_screen.py"
 $INSTALL_DIR = "$env:LOCALAPPDATA\GhostScreen"
 $SCRIPT_PATH = "$INSTALL_DIR\$SCRIPT_NAME"
@@ -41,7 +42,8 @@ if (-not (Test-Path $INSTALL_DIR)) {
     New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
 }
 try {
-    Invoke-WebRequest -Uri "$REPO/$SCRIPT_NAME" -OutFile $SCRIPT_PATH
+    $apiUrl = "https://api.github.com/repos/$OWNER/$REPO_NAME/contents/$SCRIPT_NAME"
+    Invoke-WebRequest -Uri $apiUrl -Headers @{"Accept"="application/vnd.github.v3.raw"} -OutFile $SCRIPT_PATH
     Write-Host "    Script downloaded to $SCRIPT_PATH" -ForegroundColor Green
 } catch {
     Write-Host "    Failed to download script. Check internet connection." -ForegroundColor Red

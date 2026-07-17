@@ -1559,6 +1559,7 @@ class GtkGhostScreen(GhostScreen):
 # ─── Windows backend ────────────────────────────────────────────────────
 
 if sys.platform == "win32":
+    # Windows backend using pywin32 + ctypes for Win32 APIs
     class WindowsGhostScreen(GhostScreen):
         def __init__(self, cfg=None):
             super().__init__(cfg)

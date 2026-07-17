@@ -16,6 +16,7 @@ VERSION = "1.0.0"
 PID_FILE = "/tmp/ghost_screen.pid"
 SLEEP_LOG = "/tmp/ghost_screen_sleep.log"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ghost_screen.json")
+CONFIG_FILE_USER = os.path.join(os.path.expanduser("~/.config/ghost-screen"), "ghost_screen.json")
 
 GHOST_POLYGON = [
     (-0.32, -0.48), (-0.24, -0.56), (-0.12, -0.60),
@@ -100,12 +101,14 @@ def hex_to_rgba(h, a=1.0):
 
 def load_config():
     cfg = {}
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE) as f:
-                cfg = json.load(f)
-        except Exception:
-            pass
+    for path in (CONFIG_FILE, CONFIG_FILE_USER):
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    cfg = json.load(f)
+                    break
+            except Exception:
+                pass
     return cfg
 
 
@@ -339,8 +342,6 @@ def _set_shortcut(combo):
     cmd = _get_cmd_path()
     de = detect_de()
     combo_str = "+".join(mods + [key])
-
-    handlers = {}
 
     def _gnome_h():
         return _gnome(_combo_to_gnome(mods, key), cmd)
@@ -1309,8 +1310,9 @@ class GtkGhostScreen(GhostScreen):
                 f"hardware_keycode={event.hardware_keycode}"
             )
         if event.type == Gdk.EventType.KEY_PRESS:
-            key_matches = (event.hardware_keycode == self._toggle_hw_keycode or
-                           event.keyval == self._toggle_keyval)
+            hw_matches = (self._toggle_hw_keycode and
+                          event.hardware_keycode == self._toggle_hw_keycode)
+            key_matches = hw_matches or event.keyval == self._toggle_keyval
             if key_matches:
                 RELEVANT = (Gdk.ModifierType.CONTROL_MASK |
                             Gdk.ModifierType.MOD1_MASK |

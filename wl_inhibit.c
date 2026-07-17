@@ -10,8 +10,8 @@ struct inhibitor_state {
     struct wl_surface *surface;
     struct wl_seat *seat;
     struct zwp_keyboard_shortcuts_inhibitor_v1 *inhibitor;
+    struct zwp_keyboard_shortcuts_inhibit_manager_v1 *manager;
     struct wl_registry *registry;
-    int pending_roundtrip;
     int active;
 };
 
@@ -20,14 +20,12 @@ static void registry_global(void *data, struct wl_registry *registry,
     (void)registry;
     struct inhibitor_state *state = (struct inhibitor_state *)data;
     if (strcmp(interface, "zwp_keyboard_shortcuts_inhibit_manager_v1") == 0) {
-        struct zwp_keyboard_shortcuts_inhibit_manager_v1 *mgr =
-            wl_registry_bind(registry, name,
-                             &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
-        if (mgr && state->surface && state->seat) {
+        state->manager = wl_registry_bind(registry, name,
+                                          &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
+        if (state->manager && state->surface && state->seat) {
             state->inhibitor = zwp_keyboard_shortcuts_inhibit_manager_v1_inhibit_shortcuts(
-                mgr, state->surface, state->seat);
+                state->manager, state->surface, state->seat);
         }
-        state->pending_roundtrip = 1;
     }
 }
 
@@ -128,6 +126,9 @@ void ghost_inhibit_stop(struct inhibitor_state *state) {
     if (!state) return;
     if (state->inhibitor) {
         zwp_keyboard_shortcuts_inhibitor_v1_destroy(state->inhibitor);
+    }
+    if (state->manager) {
+        zwp_keyboard_shortcuts_inhibit_manager_v1_destroy(state->manager);
     }
     if (state->registry) {
         wl_registry_destroy(state->registry);

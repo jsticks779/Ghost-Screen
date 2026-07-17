@@ -1560,6 +1560,9 @@ class GtkGhostScreen(GhostScreen):
 
 if sys.platform == "win32":
     # Windows backend using pywin32 + ctypes for Win32 APIs
+    WM_APP = 0x8000
+    WM_TOGGLE = WM_APP + 1
+
     class WindowsGhostScreen(GhostScreen):
         def __init__(self, cfg=None):
             super().__init__(cfg)
@@ -1605,6 +1608,13 @@ if sys.platform == "win32":
                 ctypes.c_void_p]
             self._user32.SetTimer.restype = ctypes.c_size_t
 
+            self._user32.PostMessageW.argtypes = [
+                wintypes.HWND, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint]
+            self._user32.PostMessageW.restype = wintypes.BOOL
+
+            self._user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+            self._user32.GetAsyncKeyState.restype = ctypes.c_short
+
             self._kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
             self._kernel32.SetThreadExecutionState.restype = wintypes.DWORD
 
@@ -1616,7 +1626,10 @@ if sys.platform == "win32":
             self._ES_DISPLAY_REQUIRED = ES_DISPLAY_REQUIRED
 
             self._init_window()
-            self._register_hotkey()
+            try:
+                self._register_hotkey()
+            except Exception:
+                pass
             self._install_hooks()
             self._prevent_sleep()
             self.particles = self._init_particles()
@@ -1665,8 +1678,23 @@ if sys.platform == "win32":
 
         def _make_kbd_proc(self):
             user32 = self._user32
+            hwnd = self._hwnd
+            VK_3 = 0x33
+            VK_CONTROL = 0x11
+            class KBDLLHOOKSTRUCT(ctypes.Structure):
+                _fields_ = [
+                    ("vkCode", ctypes.c_uint32),
+                    ("scanCode", ctypes.c_uint32),
+                    ("flags", ctypes.c_uint32),
+                    ("time", ctypes.c_uint32),
+                    ("dwExtraInfo", ctypes.c_size_t),
+                ]
             def kbd_proc(nCode, wParam, lParam):
-                if nCode >= 0 and wParam in (0x100, 0x101):
+                if nCode >= 0 and wParam == 0x100:
+                    kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                    if kb.vkCode == VK_3 and (user32.GetAsyncKeyState(VK_CONTROL) & 0x8000):
+                        user32.PostMessageW(hwnd, 0x0010, 0, 0)
+                        return 1
                     return 1
                 return user32.CallNextHookEx(0, nCode, wParam, lParam)
             return self._HOOKPROC(kbd_proc)
@@ -1716,6 +1744,7 @@ if sys.platform == "win32":
                 self._toggle_off()
                 return 0
             if msg == self._win32con.WM_DESTROY:
+                self._toggle_off()
                 self._win32gui.PostQuitMessage(0)
                 return 0
             if msg == self._win32con.WM_TIMER and wparam == self._timer_id:

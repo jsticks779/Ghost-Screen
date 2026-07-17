@@ -1755,7 +1755,8 @@ if sys.platform == "win32":
                     return 0
                 return user32.CallWindowProcW(orig_proc, hWnd, msg, wParam, lParam)
             new_proc = WNDPROC(wnd_proc)
-            user32.SetWindowLongPtrW(hwnd, -4, new_proc)
+            user32.SetWindowLongPtrW(hwnd, -4,
+                ctypes.cast(new_proc, ctypes.c_void_p).value)
             self._orig_wndproc = orig_proc
             self._new_wndproc = new_proc
 

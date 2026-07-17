@@ -513,6 +513,47 @@ def _restore_gnome_session(cookie):
         pass
 
 
+def _inhibit_freedesktop_pm():
+    """Inhibit via freedesktop PowerManagement (KDE, XFCE, MATE, LXQt).
+       Prevents screen blanking and idle suspend."""
+    try:
+        import gi
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio, GLib
+        conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        result = conn.call_sync(
+            "org.freedesktop.PowerManagement",
+            "/org/freedesktop/PowerManagement/Inhibit",
+            "org.freedesktop.PowerManagement.Inhibit", "Inhibit",
+            GLib.Variant("(ss)", ["Ghost Screen",
+                                   "Ghost overlay is active"]),
+            GLib.VariantType.new("(u)"),
+            Gio.DBusCallFlags.NONE, -1, None,
+        )
+        return result.unpack()[0]
+    except Exception:
+        return 0
+
+
+def _restore_freedesktop_pm(cookie):
+    if not cookie:
+        return
+    try:
+        import gi
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio, GLib
+        conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        conn.call_sync(
+            "org.freedesktop.PowerManagement",
+            "/org/freedesktop/PowerManagement/Inhibit",
+            "org.freedesktop.PowerManagement.Inhibit", "Uninhibit",
+            GLib.Variant("(u)", [cookie]),
+            None, Gio.DBusCallFlags.NONE, -1, None,
+        )
+    except Exception:
+        pass
+
+
 _GSETTINGS_SAVED = {}
 
 def _gsettings_save(schema, key):
@@ -760,7 +801,7 @@ class GhostScreen:
         try:
             import subprocess
             self._inhibitor = subprocess.Popen(
-                ["systemd-inhibit", "--what=sleep", "--who=Ghost Screen",
+                ["systemd-inhibit", "--what=sleep:idle", "--who=Ghost Screen",
                  "--why=Ghost overlay is active", "--mode=block", "cat"],
                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -1101,6 +1142,7 @@ class GtkGhostScreen(GhostScreen):
         self._touchpad_disabled = False
         self._touch_devs_inhibited = False
         self._gnome_session_cookie = 0
+        self._freedesktop_pm_cookie = 0
         self._toggle_mods = 0
         self._toggle_keyval = 0
         self._toggle_hw_keycode = 0
@@ -1218,11 +1260,16 @@ class GtkGhostScreen(GhostScreen):
             if _inhibit_gnome_shortcuts():
                 self._gnome_restore = True
 
-        # 4. Inhibit GNOME Session Manager (prevents screen blanking + suspend)
+        # 4. Inhibit screen blanking + idle suspend (try all standard backends)
         cookie = _inhibit_gnome_session()
         if cookie:
             self._gnome_session_cookie = cookie
             self._write_sleep_log(f"GNOME session inhibit: cookie={cookie}")
+        if not cookie:
+            cookie = _inhibit_freedesktop_pm()
+            if cookie:
+                self._freedesktop_pm_cookie = cookie
+                self._write_sleep_log(f"Freedesktop PM inhibit: cookie={cookie}")
 
         # 5. Seat grab (blocks client-level input)
         try:
@@ -1303,6 +1350,9 @@ class GtkGhostScreen(GhostScreen):
         if self._gnome_session_cookie:
             _restore_gnome_session(self._gnome_session_cookie)
             self._gnome_session_cookie = 0
+        if self._freedesktop_pm_cookie:
+            _restore_freedesktop_pm(self._freedesktop_pm_cookie)
+            self._freedesktop_pm_cookie = 0
         if self._shortcut_blocker:
             self._shortcut_blocker.destroy()
             self._shortcut_blocker = None

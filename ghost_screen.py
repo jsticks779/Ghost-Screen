@@ -777,6 +777,8 @@ class GhostScreen:
     def _acquire_inhibitor(self):
         self._inhibit_fd = None
         self._sleep_inhibited = False
+        if sys.platform == "win32":
+            return
         # Try direct D-Bus approach (most reliable — works on all systemd Linux)
         try:
             import gi, os

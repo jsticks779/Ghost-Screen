@@ -5,6 +5,32 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="ghost_screen.py"
 NAME="ghost-screen"
 
+# ── Self-bootstrap: if piped (no local clone), fetch the repo first ────
+if [ ! -f "$DIR/$SCRIPT" ]; then
+    REPO="https://github.com/jsticks779/Ghost-Screen.git"
+    TMPDIR="$(mktemp -d)"
+    echo "==> Downloading Ghost Screen..."
+    if command -v git &>/dev/null; then
+        git clone --depth=1 "$REPO" "$TMPDIR" 2>/dev/null || {
+            curl -fsSL "$REPO/archive/main.tar.gz" | tar -xz -C "$TMPDIR" --strip=1 2>/dev/null || {
+                echo "    Failed to download. Install git or curl." >&2
+                exit 1
+            }
+        }
+    elif command -v curl &>/dev/null; then
+        curl -fsSL "$REPO/archive/main.tar.gz" | tar -xz -C "$TMPDIR" --strip=1 || {
+            echo "    Failed to download. Install git or curl." >&2
+            exit 1
+        }
+    else
+        echo "    git or curl required to download. Clone manually:" >&2
+        echo "    git clone $REPO" >&2
+        exit 1
+    fi
+    cd "$TMPDIR"
+    exec bash install.sh
+fi
+
 echo "==> Installing Ghost Screen..."
 
 # ── Auto-detect: root vs user install ──────────────────────────────────

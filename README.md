@@ -33,6 +33,12 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 ## Installation (one command — fully automatic)
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.sh | bash
+```
+
+Or if you have the repo cloned:
+
+```bash
 git clone https://github.com/jsticks779/Ghost-Screen.git
 cd Ghost-Screen
 ./install.sh

@@ -14,6 +14,7 @@ import atexit
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
 PID_FILE = "/tmp/ghost_screen.pid"
+SLEEP_LOG = "/tmp/ghost_screen_sleep.log"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ghost_screen.json")
 
 GHOST_POLYGON = [
@@ -676,6 +677,14 @@ class GhostScreen:
             pass
         self._release_inhibitor()
 
+    def _write_sleep_log(self, msg):
+        try:
+            with open(SLEEP_LOG, "a") as f:
+                import datetime
+                f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+        except Exception:
+            pass
+
     def _acquire_inhibitor(self):
         self._inhibit_fd = None
         self._sleep_inhibited = False
@@ -695,9 +704,10 @@ class GhostScreen:
             )
             self._inhibit_fd = fd_list.get(0)
             self._sleep_inhibited = True
+            self._write_sleep_log("OK (D-Bus logind)")
             return
-        except Exception:
-            pass
+        except Exception as e:
+            self._write_sleep_log(f"D-Bus FAILED: {e}")
         # Fallback: systemd-inhibit CLI
         try:
             import subprocess
@@ -708,10 +718,13 @@ class GhostScreen:
                 stderr=subprocess.DEVNULL,
             )
             self._sleep_inhibited = True
-        except Exception:
+            self._write_sleep_log("OK (systemd-inhibit)")
+        except Exception as e:
             self._inhibitor = None
+            self._write_sleep_log(f"systemd-inhibit FAILED: {e}")
 
     def _release_inhibitor(self):
+        self._write_sleep_log("RELEASED")
         self._sleep_inhibited = False
         if self._inhibit_fd is not None:
             try:
@@ -1510,6 +1523,7 @@ def main():
         else:
             print("  Warning: Could not acquire sleep inhibitor — PC may still sleep.")
             print("  Install systemd or python3-gi for sleep inhibition.")
+        print(f"  See also: cat {SLEEP_LOG}")
         try:
             app.run()
         except KeyboardInterrupt:

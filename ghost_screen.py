@@ -1616,7 +1616,10 @@ if sys.platform == "win32":
             user32 = self._user32
             VK_3 = 0x33
             VK_CONTROL = 0x11
+            WM_KEYDOWN = 0x100
+            WM_KEYUP = 0x101
             app = self
+            ctrl_down = False
             class KBDLLHOOKSTRUCT(ctypes.Structure):
                 _fields_ = [
                     ("vkCode", ctypes.c_uint32),
@@ -1626,19 +1629,28 @@ if sys.platform == "win32":
                     ("dwExtraInfo", ctypes.c_size_t),
                 ]
             def kbd_proc(nCode, wParam, lParam):
-                if nCode >= 0 and wParam == 0x100:
+                nonlocal ctrl_down
+                if nCode >= 0:
                     kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-                    if kb.vkCode == VK_3 and (user32.GetAsyncKeyState(VK_CONTROL) & 0x8000):
-                        app._restore_sleep()
-                        app._uninstall_hooks()
-                        app._quit = True
-                        if app._root:
-                            try:
-                                app._root.quit()
-                            except Exception:
-                                pass
+                    if wParam == WM_KEYDOWN:
+                        if kb.vkCode == VK_CONTROL:
+                            ctrl_down = True
+                            return 1
+                        if kb.vkCode == VK_3 and ctrl_down:
+                            app._restore_sleep()
+                            app._uninstall_hooks()
+                            app._quit = True
+                            if app._root:
+                                try:
+                                    app._root.quit()
+                                except Exception:
+                                    pass
+                            return 1
                         return 1
-                    return 1
+                    if wParam == WM_KEYUP:
+                        if kb.vkCode == VK_CONTROL:
+                            ctrl_down = False
+                        return 1
                 return user32.CallNextHookEx(0, nCode, wParam, lParam)
             return self._HOOKPROC(kbd_proc)
 
@@ -1711,8 +1723,45 @@ if sys.platform == "win32":
                 except Exception:
                     pass
 
+        def _block_touch(self):
+            import ctypes
+            from ctypes import wintypes
+            hwnd = self._root.winfo_id()
+            user32 = self._user32
+            WM_TOUCH = 0x0240
+            WM_GESTURE = 0x0119
+            WM_POINTERDOWN = 0x0246
+            WM_POINTERUP = 0x0247
+            WM_POINTERUPDATE = 0x0245
+            GESTURE_BLOCK = (WM_TOUCH, WM_GESTURE,
+                             WM_POINTERDOWN, WM_POINTERUP, WM_POINTERUPDATE)
+
+            WNDPROC = ctypes.WINFUNCTYPE(
+                wintypes.LPARAM,
+                wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+
+            user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.GetWindowLongPtrW.restype = wintypes.LPARAM
+            user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LPARAM]
+            user32.SetWindowLongPtrW.restype = wintypes.LPARAM
+            user32.CallWindowProcW.argtypes = [
+                wintypes.LPARAM, wintypes.HWND, wintypes.UINT,
+                wintypes.WPARAM, wintypes.LPARAM]
+            user32.CallWindowProcW.restype = wintypes.LPARAM
+
+            orig_proc = user32.GetWindowLongPtrW(hwnd, -4)
+            def wnd_proc(hWnd, msg, wParam, lParam):
+                if msg in GESTURE_BLOCK:
+                    return 0
+                return user32.CallWindowProcW(orig_proc, hWnd, msg, wParam, lParam)
+            new_proc = WNDPROC(wnd_proc)
+            user32.SetWindowLongPtrW(hwnd, -4, new_proc)
+            self._orig_wndproc = orig_proc
+            self._new_wndproc = new_proc
+
         def run(self):
             self._create_window()
+            self._block_touch()
             while not self._quit:
                 try:
                     self._root.mainloop()

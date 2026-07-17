@@ -11,7 +11,7 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 - **Works on every Linux compositor** — X11, Wayland (GNOME/KDE/Sway/Hyprland/River/COSMIC/Deepin/LXQt)
 - **Auto-transparent on Wayland** — composited with Pillow + GdkPixbuf (no Cairo GI needed)
 - **Survives sleep/wake** — window auto-restarts after suspend on both backends
-- **Blocks PC sleep** while ghost is active — toggle off to allow sleep
+- **Blocks PC sleep + screen blanking** while ghost is active — toggle off to allow sleep
 - Auto-darkens on X11 with tkinter (also works on XWayland as a fallback)
 - Customizable colors, opacity, speed, and particle count
 - Dark semi-transparent overlay over your desktop
@@ -87,11 +87,17 @@ The **only** way to dismiss the ghost is pressing your shortcut again (toggle of
 
 ### Sleep / suspend behavior
 
-While the ghost is active, **PC sleep is blocked** automatically (via
-D-Bus `org.freedesktop.login1.Manager.Inhibit`, with `systemd-inhibit`
-CLI fallback). The ghost survives suspend/resume on both backends — if
-the window is destroyed during sleep, the process detects it and recreates
-it.
+While the ghost is active, **PC sleep + screen blanking are blocked**
+automatically. A multi-backend inhibitor tries every available protocol:
+
+- **logind** (D-Bus): system suspend — works on any systemd/elogind Linux
+- **GNOME Session Manager**: screen blanking, lock, and suspend
+- **freedesktop PowerManagement**: screen blanking and idle suspend
+  (KDE, XFCE, MATE, LXQt)
+- **systemd-inhibit CLI**: fallback on all systemd systems
+
+The ghost survives suspend/resume on both backends — if the window is
+destroyed during sleep, the process detects it and recreates it.
 
 ## Keyboard Shortcut
 
@@ -229,10 +235,11 @@ displayed — running the script again kills the existing instance (toggle
 behavior). The ghost floats, rotates, pulses, and drifts particles at ~30 FPS.
 Only the shortcut toggles it off — no click or Escape.
 
-The script acquires a sleep lock (D-Bus `org.freedesktop.login1.Manager.Inhibit`,
-with `systemd-inhibit` CLI fallback) while the ghost is active, preventing the
-PC from suspending. The lock is released automatically on toggle-off or
-`--kill`.
+The script acquires a sleep + idle lock while the ghost is active, preventing
+the PC from suspending or the screen from blanking. Three backends are tried
+in order (logind → GNOME Session → freedesktop PowerManagement), with a
+`systemd-inhibit` CLI fallback. All locks are released automatically on
+toggle-off or `--kill`.
 
 ## License
 

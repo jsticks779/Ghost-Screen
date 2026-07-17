@@ -1,19 +1,4 @@
-#!/usr/bin/env pwsh
-<#
-.SYNOPSIS
-  Install Ghost Screen on Windows
-.DESCRIPTION
-  Installs Python (if missing), pywin32 + pillow, and the ghost-screen script.
-  Run as Administrator:
-    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('URL'))
-#>
-
-# Ensure we're not nesting PowerShell unnecessarily
-if ($MyInvocation.Line -match '^powershell ') {
-    Write-Host "    Don't wrap this in 'powershell -c' — run the iex command directly from an admin PowerShell prompt." -ForegroundColor Red
-    Write-Host "    Correct: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('...'))" -ForegroundColor Yellow
-    exit 1
-}
+param()
 
 $REPO = "https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main"
 $SCRIPT_NAME = "ghost_screen.py"
@@ -35,7 +20,6 @@ if (-not $python) {
     Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.5/python-3.12.5-amd64.exe" -OutFile $pyInstaller
     Write-Host "    Running Python installer (check 'Add to PATH' when prompted)..." -ForegroundColor Yellow
     Start-Process -Wait -FilePath $pyInstaller -ArgumentList "/quiet", "InstallAllUsers=0", "PrependPath=1"
-    # Refresh PATH
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" +
                 [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     Write-Host "    Python installed." -ForegroundColor Green
@@ -65,12 +49,8 @@ try {
 }
 
 # ── Create launcher cmd ────────────────────────────────────────────────
-$cmdContent = "@echo off`r`n""%~dp0..\..\..\Python312\python.exe"" ""$SCRIPT_PATH"" %*`r`n"
-# Try to find the actual Python path
 $pyPath = (Get-Command $pythonExe -ErrorAction SilentlyContinue).Source
-if ($pyPath) {
-    $cmdContent = "@echo off`r`n""$pyPath"" ""$SCRIPT_PATH"" %*`r`n"
-}
+$cmdContent = "@echo off`r`n""$pyPath"" ""$SCRIPT_PATH"" %*`r`n"
 Set-Content -Path $CMD_PATH -Value $cmdContent
 Write-Host "    Launcher created: $CMD_PATH" -ForegroundColor Green
 

@@ -11,10 +11,12 @@ import subprocess
 import shutil
 import atexit
 
+import tempfile
+
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
-PID_FILE = "/tmp/ghost_screen.pid"
-SLEEP_LOG = "/tmp/ghost_screen_sleep.log"
+PID_FILE = os.path.join(tempfile.gettempdir(), "ghost_screen.pid")
+SLEEP_LOG = os.path.join(tempfile.gettempdir(), "ghost_screen_sleep.log")
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ghost_screen.json")
 CONFIG_FILE_USER = os.path.join(os.path.expanduser("~/.config/ghost-screen"), "ghost_screen.json")
 
@@ -2140,7 +2142,7 @@ def main():
         else:
             print("  Warning: Could not acquire sleep inhibitor — PC may still sleep.")
             print("  Install systemd or python3-gi for sleep inhibition.")
-        print(f"  See also: cat {SLEEP_LOG}")
+        print(f"  Log: {SLEEP_LOG}")
         try:
             app.run()
         except KeyboardInterrupt:

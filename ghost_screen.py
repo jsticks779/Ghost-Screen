@@ -1578,6 +1578,7 @@ if sys.platform == "win32":
             self._win32con = win32con
             self._win32gui = win32gui
             self._user32 = ctypes.windll.user32
+            self._kernel32 = ctypes.windll.kernel32
 
             self._user32.RegisterHotKey.argtypes = [
                 wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
@@ -1597,6 +1598,16 @@ if sys.platform == "win32":
 
             self._user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
             self._user32.UnhookWindowsHookEx.restype = wintypes.BOOL
+
+            self._kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
+            self._kernel32.SetThreadExecutionState.restype = wintypes.DWORD
+
+            ES_CONTINUOUS = 0x80000000
+            ES_SYSTEM_REQUIRED = 0x00000001
+            ES_DISPLAY_REQUIRED = 0x00000002
+            self._ES_CONTINUOUS = ES_CONTINUOUS
+            self._ES_SYSTEM_REQUIRED = ES_SYSTEM_REQUIRED
+            self._ES_DISPLAY_REQUIRED = ES_DISPLAY_REQUIRED
 
             self._init_window()
             self._register_hotkey()
@@ -1685,12 +1696,12 @@ if sys.platform == "win32":
             self._blocking = False
 
         def _prevent_sleep(self):
-            self._win32api.SetThreadExecutionState(
-                self._win32con.ES_CONTINUOUS | self._win32con.ES_SYSTEM_REQUIRED |
-                self._win32con.ES_DISPLAY_REQUIRED)
+            self._kernel32.SetThreadExecutionState(
+                self._ES_CONTINUOUS | self._ES_SYSTEM_REQUIRED |
+                self._ES_DISPLAY_REQUIRED)
 
         def _restore_sleep(self):
-            self._win32api.SetThreadExecutionState(self._win32con.ES_CONTINUOUS)
+            self._kernel32.SetThreadExecutionState(self._ES_CONTINUOUS)
 
         def _wndproc(self, hwnd, msg, wparam, lparam):
             if msg == self._win32con.WM_HOTKEY and wparam == self._hotkey_id:

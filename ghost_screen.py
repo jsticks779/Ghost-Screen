@@ -838,6 +838,9 @@ class GhostScreen:
                     pass
             self._inhibitor = None
 
+    def _cleanup_inhibition(self):
+        pass
+
     def run(self):
         raise NotImplementedError
 
@@ -1575,6 +1578,10 @@ if sys.platform == "win32":
             self._kbd_cb = None
             self._mouse_cb = None
             self._quit = False
+            self._visible = True
+            self._grab_active = False
+            self._passive_kbd_hook = None
+            self._passive_kbd_cb = None
 
             import ctypes
             from ctypes import wintypes
@@ -1642,25 +1649,7 @@ if sys.platform == "win32":
                             ctrl_down = True
                             return 1
                         if kb.vkCode == VK_3 and ctrl_down:
-                            app._quit = True
-                            if app._root:
-                                try:
-                                    app._restore_sleep()
-                                    app._uninstall_hooks()
-                                except Exception:
-                                    pass
-                                try:
-                                    app._root.grab_release()
-                                except Exception:
-                                    pass
-                                try:
-                                    app._root.destroy()
-                                except Exception:
-                                    pass
-                                try:
-                                    app._root.quit()
-                                except Exception:
-                                    pass
+                            app._toggle_off()
                             return 1
                         return 1
                     if wParam in (WM_KEYUP, WM_SYSKEYUP):
@@ -1677,6 +1666,55 @@ if sys.platform == "win32":
                     return 1
                 return user32.CallNextHookEx(0, nCode, wParam, lParam)
             return self._HOOKPROC(mouse_proc)
+
+        def _make_passive_kbd_proc(self):
+            """Non-blocking hook that only monitors for Ctrl+3 to re-toggle."""
+            import ctypes
+            user32 = self._user32
+            VK_3 = 0x33
+            CTRL_KEYS = (0x11, 0xA2, 0xA3)
+            WM_KEYDOWN = 0x100
+            WM_SYSKEYDOWN = 0x104
+            WM_KEYUP = 0x101
+            WM_SYSKEYUP = 0x105
+            app = self
+            ctrl_down = False
+            class KBDLLHOOKSTRUCT(ctypes.Structure):
+                _fields_ = [
+                    ("vkCode", ctypes.c_uint32),
+                    ("scanCode", ctypes.c_uint32),
+                    ("flags", ctypes.c_uint32),
+                    ("time", ctypes.c_uint32),
+                    ("dwExtraInfo", ctypes.c_size_t),
+                ]
+            def kbd_proc(nCode, wParam, lParam):
+                nonlocal ctrl_down
+                if nCode >= 0:
+                    kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                    if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                        if kb.vkCode in CTRL_KEYS:
+                            ctrl_down = True
+                        elif kb.vkCode == VK_3 and ctrl_down:
+                            app._toggle_on()
+                            return 1
+                    elif wParam in (WM_KEYUP, WM_SYSKEYUP):
+                        if kb.vkCode in CTRL_KEYS:
+                            ctrl_down = False
+                # Pass ALL events through
+                return user32.CallNextHookEx(0, nCode, wParam, lParam)
+            return self._HOOKPROC(kbd_proc)
+
+        def _install_passive_hook(self):
+            self._passive_kbd_cb = self._make_passive_kbd_proc()
+            self._passive_kbd_hook = self._user32.SetWindowsHookExW(
+                13, self._passive_kbd_cb, 0, 0)
+            self._blocking = False
+
+        def _uninstall_passive_hook(self):
+            if self._passive_kbd_hook:
+                self._user32.UnhookWindowsHookEx(self._passive_kbd_hook)
+                self._passive_kbd_hook = None
+            self._passive_kbd_cb = None
 
         def _install_hooks(self):
             self._kbd_cb = self._make_kbd_proc()
@@ -1696,6 +1734,10 @@ if sys.platform == "win32":
             self._mouse_cb = None
             self._blocking = False
 
+        def _uninstall_all_hooks(self):
+            self._uninstall_hooks()
+            self._uninstall_passive_hook()
+
         def _grab_input(self):
             try:
                 self._root.grab_set_global()
@@ -1711,13 +1753,14 @@ if sys.platform == "win32":
             self._root.bind("<Motion>", self._on_blocked_key)
 
         def _on_toggle_key(self, event):
-            self._restore_sleep()
-            self._uninstall_hooks()
-            super()._on_toggle_key(event)
+            if self._visible:
+                self._toggle_off()
+            else:
+                self._toggle_on()
 
         def _signal_quit(self):
             self._restore_sleep()
-            self._uninstall_hooks()
+            self._uninstall_all_hooks()
             self._quit = True
             if self._root:
                 try:
@@ -1728,14 +1771,36 @@ if sys.platform == "win32":
         def _toggle_off(self):
             self._restore_sleep()
             self._uninstall_hooks()
-            self._quit = True
+            self._install_passive_hook()
+            self._visible = False
+            self._grab_active = False
             if self._root:
                 try:
                     self._root.grab_release()
                 except Exception:
                     pass
                 try:
-                    self._root.quit()
+                    self._root.withdraw()
+                except Exception:
+                    pass
+
+        def _toggle_on(self):
+            self._uninstall_passive_hook()
+            self._install_hooks()
+            self._prevent_sleep()
+            self._visible = True
+            if self._root:
+                try:
+                    self._root.deiconify()
+                except Exception:
+                    pass
+                try:
+                    self._root.grab_set_global()
+                    self._grab_active = True
+                except Exception:
+                    self._grab_active = False
+                try:
+                    self._root.lift()
                 except Exception:
                     pass
 

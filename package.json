@@ -1,0 +1,28 @@
+{
+  "name": "ghost-screen",
+  "version": "1.0.0",
+  "description": "Animated tech ghost overlay for any Linux desktop",
+  "homepage": "https://github.com/jsticks779/Ghost-Screen",
+  "license": "MIT",
+  "author": "",
+  "keywords": ["screensaver", "overlay", "cyberpunk", "linux", "wayland", "x11"],
+  "os": ["linux"],
+  "preferGlobal": true,
+  "bin": {
+    "ghost-screen": "./ghost_screen.py"
+  },
+  "files": [
+    "ghost_screen.py",
+    "ghost_touch_inhibit.c",
+    "keyboard-shortcuts-inhibit-unstable-v1.xml",
+    "wl_inhibit.c",
+    "wl_ksh_code.c",
+    "zwp_ksh_client.h",
+    "install.sh",
+    "uninstall.sh",
+    "npm-install.js"
+  ],
+  "scripts": {
+    "postinstall": "node -e \"require('./npm-install.js').postinstall()\""
+  }
+}

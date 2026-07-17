@@ -32,12 +32,19 @@ Ctrl+3 for a cyberpunk holographic screensaver effect.
 
 ## Installation (one command — fully automatic)
 
+Choose your method:
+
+**curl** (recommended):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.sh | bash
 ```
 
-Or if you have the repo cloned:
+**npm**:
+```bash
+npm install -g ghost-screen
+```
 
+**git clone**:
 ```bash
 git clone https://github.com/jsticks779/Ghost-Screen.git
 cd Ghost-Screen
@@ -193,12 +200,19 @@ Create a `ghost_screen.json` file next to the script:
 ## Uninstall
 
 ```bash
+# If installed via curl
+curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/uninstall.sh | bash
+
+# If installed via npm
+npm uninstall -g ghost-screen
+
+# If installed via git clone
 cd Ghost-Screen
 ./uninstall.sh
 ```
 
-This removes the binary (from both `/usr/local/bin` and `~/.local/bin`),
-desktop entry, **and cleans up the Ctrl+3 shortcut** from all desktop
+All three methods remove the binary (from `/usr/local/bin` and `~/.local/bin`),
+desktop entry, **and clean up the Ctrl+3 shortcut** from all desktop
 environments and wlroots configs.
 
 Or do it manually:

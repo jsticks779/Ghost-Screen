@@ -1855,6 +1855,7 @@ if sys.platform == "win32":
             self._restore_sleep()
 
         def run(self):
+            self._render_frame()
             self._user32.SetTimer(self._hwnd, self._timer_id,
                                    self.cfg["frame_delay"], 0)
             self._win32gui.PumpMessages()

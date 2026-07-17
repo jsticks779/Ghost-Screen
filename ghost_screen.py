@@ -1702,7 +1702,7 @@ if sys.platform == "win32":
             self._write_sleep_log(f"Screen size: {self.sw}x{self.sh}")
 
             self._hwnd = self._win32gui.CreateWindowEx(
-                0x80000 | 0x8 | 0x80,
+                0x8 | 0x80,
                 wc.lpszClassName, "Ghost Screen",
                 0x80000000,
                 0, 0, self.sw, self.sh, 0, 0, wc.hInstance, None)
@@ -1710,10 +1710,6 @@ if sys.platform == "win32":
 
             if not self._hwnd:
                 raise RuntimeError("CreateWindowEx returned NULL")
-
-            self._user32.SetLayeredWindowAttributes(
-                self._hwnd, 0, int(255 * 0.88), 2)
-            self._write_sleep_log("SetLayeredWindowAttributes done")
 
             self._win32gui.ShowWindow(self._hwnd, 4)
             self._win32gui.UpdateWindow(self._hwnd)
@@ -1842,7 +1838,7 @@ if sys.platform == "win32":
                 gy = cy + float_y
                 scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
 
-                img = Image.new("RGBA", (self.sw, self.sh), (5, 5, 16, 255))
+                img = Image.new("RGB", (self.sw, self.sh), c["bg"])
                 draw = ImageDraw.Draw(img)
                 self._draw_vignette(draw, t, c)
                 self._draw_grid(draw, t, cx, cy, c["grid"])

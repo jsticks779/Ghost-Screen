@@ -1827,8 +1827,9 @@ if sys.platform == "win32":
                 self._draw_particles(draw, t, c["particle"], c["primary"])
                 self._draw_hud(draw, t, cx, gy, scale, c["accent"])
                 self._display_frame(img)
-            except Exception:
-                pass
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
 
         def _display_frame(self, img):
             from PIL import ImageWin

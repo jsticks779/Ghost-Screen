@@ -1579,8 +1579,24 @@ if sys.platform == "win32":
             self._win32gui = win32gui
             self._user32 = ctypes.windll.user32
 
-            HOOKPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+            self._user32.RegisterHotKey.argtypes = [
+                wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+            self._user32.RegisterHotKey.restype = wintypes.BOOL
+
+            HOOKPROC = ctypes.WINFUNCTYPE(
+                wintypes.LPARAM, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
             self._HOOKPROC = HOOKPROC
+
+            self._user32.SetWindowsHookExW.argtypes = [
+                ctypes.c_int, HOOKPROC, wintypes.HINSTANCE, wintypes.DWORD]
+            self._user32.SetWindowsHookExW.restype = wintypes.HHOOK
+
+            self._user32.CallNextHookEx.argtypes = [
+                wintypes.HHOOK, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
+            self._user32.CallNextHookEx.restype = wintypes.LPARAM
+
+            self._user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
+            self._user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 
             self._init_window()
             self._register_hotkey()
@@ -1876,7 +1892,9 @@ def create_ghost_screen(cfg=None):
             print(f"  Windows backend requires pywin32 + Pillow: pip install pywin32 pillow")
             print(f"  ({e})")
         except Exception as e:
-            print(f"  Windows backend failed ({e}).")
+            import traceback
+            print(f"  Windows backend failed:")
+            traceback.print_exc()
         sys.exit(1)
 
     display_type = os.environ.get("XDG_SESSION_TYPE", "x11")

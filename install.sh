@@ -390,10 +390,10 @@ setup_kde() {
     local home="$REAL_HOME"
     if [ "$(id -u)" -eq 0 ]; then
         su - "$user" -c "kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group 'Ghost Screen' --key 'Ghost Screen' '_launch $CMD'" 2>/dev/null
-        su - "$user" -c "kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group 'Ghost Screen' --key 'Ghost Screen' 'Ctrl+3'" 2>/dev/null
+        su - "$user" -c "kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group 'Ghost Screen' --key 'Ghost Screen' 'Ctrl+Shift+3'" 2>/dev/null
     else
         kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group "Ghost Screen" --key "Ghost Screen" "_launch $CMD" 2>/dev/null
-        kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group "Ghost Screen" --key "Ghost Screen" "Ctrl+3" 2>/dev/null
+        kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group "Ghost Screen" --key "Ghost Screen" "Ctrl+Shift+3" 2>/dev/null
     fi
     qdbus org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.reloadConfig 2>/dev/null || true
     return 0
@@ -413,8 +413,8 @@ setup_sway() {
     grep -q "ghost-screen" "$cfg" && return 0
     cat >> "$cfg" << EOF
 
-# Added by Ghost Screen installer — Ctrl+3 toggles ghost overlay
-bindsym Ctrl+3 exec $CMD
+# Added by Ghost Screen installer — Ctrl+Shift+3 toggles ghost overlay
+bindsym Ctrl+Shift+3 exec $CMD
 EOF
     SHORTCUT_MSG="Reload Sway: swaymsg reload"
     return 0
@@ -426,7 +426,7 @@ setup_hyprland() {
     grep -q "ghost-screen" "$cfg" && return 0
     cat >> "$cfg" << EOF
 
-# Added by Ghost Screen installer — Ctrl+3 toggles ghost overlay
+# Added by Ghost Screen installer — Ctrl+Shift+3 toggles ghost overlay
 bind = Ctrl, 3, exec, $CMD
 EOF
     SHORTCUT_MSG="Reload Hyprland: hyprctl reload"
@@ -439,7 +439,7 @@ setup_river() {
     grep -q "ghost-screen" "$cfg" && return 0
     cat >> "$cfg" << EOF
 
-# Added by Ghost Screen installer — Ctrl+3 toggles ghost overlay
+# Added by Ghost Screen installer — Ctrl+Shift+3 toggles ghost overlay
 riverctl map normal Ctrl 3 spawn "$CMD" &
 EOF
     SHORTCUT_MSG="Restart River to activate"
@@ -462,7 +462,7 @@ setup_lxqt() {
 [Ghost Screen]
 Comment=
 Exec=$CMD
-Shortcut=Ctrl+3
+Shortcut=Ctrl+Shift+3
 EOF
     return 0
 }
@@ -498,31 +498,31 @@ XEOF
 # ── Try shortcut setup ────────────────────────────────────────────────
 
 case "$DE" in
-    gnome)  setup_gnome && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (GNOME)." ;;
-    kde)    setup_kde && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (KDE Plasma).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
-    xfce)   setup_xfce && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (XFCE)." ;;
-    sway)   setup_sway && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (Sway).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
-    hyprland) setup_hyprland && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (Hyprland).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
-    river)  setup_river && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (River).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
-    deepin) setup_deepin && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (Deepin)." ;;
-    lxqt)   setup_lxqt && SHORTCUT_OK=1 && echo "    Ctrl+3 shortcut set (LXQt)." ;;
+    gnome)  setup_gnome && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (GNOME)." ;;
+    kde)    setup_kde && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (KDE Plasma).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
+    xfce)   setup_xfce && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (XFCE)." ;;
+    sway)   setup_sway && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (Sway).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
+    hyprland) setup_hyprland && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (Hyprland).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
+    river)  setup_river && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (River).${SHORTCUT_MSG:+ $SHORTCUT_MSG}" ;;
+    deepin) setup_deepin && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (Deepin)." ;;
+    lxqt)   setup_lxqt && SHORTCUT_OK=1 && echo "    Ctrl+Shift+3 shortcut set (LXQt)." ;;
     *)
         if setup_gnome; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (GNOME/gsettings)."
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (GNOME/gsettings)."
         elif setup_kde; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (KDE/kwriteconfig5)."
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (KDE/kwriteconfig5)."
         elif setup_xfce; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (XFCE/xfconf)."
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (XFCE/xfconf)."
         elif setup_sway; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (Sway).${SHORTCUT_MSG:+ $SHORTCUT_MSG}"
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (Sway).${SHORTCUT_MSG:+ $SHORTCUT_MSG}"
         elif setup_hyprland; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (Hyprland).${SHORTCUT_MSG:+ $SHORTCUT_MSG}"
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (Hyprland).${SHORTCUT_MSG:+ $SHORTCUT_MSG}"
         elif setup_river; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (River).${SHORTCUT_MSG:+ $SHORTCUT_MSG}"
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (River).${SHORTCUT_MSG:+ $SHORTCUT_MSG}"
         elif setup_deepin; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (Deepin)."
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (Deepin)."
         elif setup_xbindkeys; then
-            SHORTCUT_OK=1; echo "    Ctrl+3 shortcut set (xbindkeys fallback)."
+            SHORTCUT_OK=1; echo "    Ctrl+Shift+3 shortcut set (xbindkeys fallback)."
         fi
         ;;
 esac
@@ -533,7 +533,7 @@ if [ -n "$SHORTCUT_OK" ]; then
     CONFIG_DIR="$REAL_HOME/.config/ghost-screen"
     mkdir -p "$CONFIG_DIR"
     cat > "$CONFIG_DIR/shortcut.json" << EOF
-{"shortcut": "Ctrl+3", "de": "${DE:-x11}"}
+{"shortcut": "Ctrl+Shift+3", "de": "${DE:-x11}"}
 EOF
 fi
 
@@ -558,12 +558,12 @@ echo "  Ghost Screen installed!"
 echo ""
 
 if [ -n "$SHORTCUT_OK" ]; then
-    echo "  Press  Ctrl+3  to toggle the ghost on/off"
+    echo "  Press  Ctrl+Shift+3  to toggle the ghost on/off"
     [ -n "$SHORTCUT_MSG" ] && echo "  $SHORTCUT_MSG"
 else
     echo "  Shortcut not set — do it manually:"
     echo "    Settings -> Keyboard -> Shortcuts -> +"
-    echo "    Name: Ghost Screen,  Command: $CMD,  Shortcut: Ctrl+3"
+    echo "    Name: Ghost Screen,  Command: $CMD,  Shortcut: Ctrl+Shift+3"
 fi
 echo "  Kill: $CMD --kill"
 echo "  Check: $CMD --check"

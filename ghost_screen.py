@@ -1054,6 +1054,7 @@ class GtkGhostScreen(GhostScreen):
         self._touch_devs_inhibited = False
         self._toggle_mods = 0
         self._toggle_keyval = 0
+        self._toggle_hw_keycode = 0
         self._init_toggle_key()
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
         signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
@@ -1103,6 +1104,16 @@ class GtkGhostScreen(GhostScreen):
                 self.sw, self.sh = geo.width, geo.height
         if not self.sw:
             self.sw, self.sh = 1920, 1080
+
+        if self._toggle_keyval and display:
+            keymap = Gdk.Keymap.get_for_display(display)
+            success, entries = keymap.get_entries_for_keyval(self._toggle_keyval)
+            if success and entries:
+                self._toggle_hw_keycode = entries[0].keycode
+        self._write_sleep_log(
+            f"Toggle key: keyval={self._toggle_keyval} hw_keycode={self._toggle_hw_keycode} "
+            f"mods={self._toggle_mods}"
+        )
 
         self.particles = self._init_particles()
         self._write_pid()
@@ -1191,8 +1202,16 @@ class GtkGhostScreen(GhostScreen):
         import gi
         gi.require_version("Gdk", "3.0")
         from gi.repository import Gdk
+        if event.type in (Gdk.EventType.KEY_PRESS, Gdk.EventType.KEY_RELEASE):
+            self._write_sleep_log(
+                f"KEY{'UP' if event.type == Gdk.EventType.KEY_RELEASE else 'DOWN'}: "
+                f"keyval={event.keyval} state={event.state} "
+                f"hardware_keycode={event.hardware_keycode}"
+            )
         if event.type == Gdk.EventType.KEY_PRESS:
-            if event.keyval == self._toggle_keyval:
+            key_matches = (event.hardware_keycode == self._toggle_hw_keycode or
+                           event.keyval == self._toggle_keyval)
+            if key_matches:
                 RELEVANT = (Gdk.ModifierType.CONTROL_MASK |
                             Gdk.ModifierType.MOD1_MASK |
                             Gdk.ModifierType.SHIFT_MASK |
@@ -1202,16 +1221,10 @@ class GtkGhostScreen(GhostScreen):
                     self._write_sleep_log("TOGGLE KEY PRESSED - dismissing")
                     self._toggle_off()
                     return True
-                else:
-                    self._write_sleep_log(
-                        f"KEY PRESS: keyval={event.keyval} "
-                        f"state={event.state} mods={state} "
-                        f"expected_mods={self._toggle_mods} "
-                        f"expected_keyval={self._toggle_keyval}"
-                    )
         return True
 
     def _toggle_off(self):
+        self._write_sleep_log("TOGGLE_OFF called")
         self._cleanup_inhibition()
         self._quit = True
 

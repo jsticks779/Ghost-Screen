@@ -58,7 +58,7 @@ function CodeBlock({ label, code }: { label?: string; code: string }) {
           {label}
         </div>
       )}
-      <pre className={`text-sm bg-card border border-border ${label ? 'rounded-b-lg' : 'rounded-lg'} p-4 overflow-x-auto font-mono leading-relaxed scrollbar-none`}>
+      <pre className={`text-sm bg-card border border-border ${label ? 'rounded-b-lg' : 'rounded-lg'} p-4 overflow-x-auto font-mono leading-relaxed scrollbar-none max-w-full`}>
         {code}
       </pre>
     </div>
@@ -102,7 +102,7 @@ export default function Docs() {
         <div className="w-6" />
       </div>
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex overflow-x-hidden">
         {/* Sidebar overlay on mobile */}
         {sidebarOpen && (
           <div className="md:hidden fixed inset-0 z-40 bg-background/80" onClick={() => setSidebarOpen(false)} />
@@ -162,7 +162,7 @@ export default function Docs() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 max-w-3xl mx-auto px-6 py-12">
+        <main className="flex-1 min-w-0 max-w-3xl mx-auto px-6 py-12">
           {/* Intro */}
           <section id="intro" className="mb-20">
             <h1 className="text-3xl font-bold mb-2">Intro</h1>

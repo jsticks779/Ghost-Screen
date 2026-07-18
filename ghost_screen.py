@@ -415,15 +415,24 @@ def _gnome(binding, cmd):
     import ast
     exist = ast.literal_eval(cur) if cur.startswith("[") else []
     found = None
+    keep = []
     for p in exist:
         c = gs("get", f"{schema}.custom-keybinding:{p}", "command").stdout.strip().strip("'")
+        b = gs("get", f"{schema}.custom-keybinding:{p}", "binding").stdout.strip().strip("'")
         if c == cmd:
             found = p
-            break
+            keep.append(p)
+        elif b == binding:
+            # Stale entry with same binding but different command — remove it
+            for k in ["name", "command", "binding"]:
+                gs("reset", f"{schema}.custom-keybinding:{p}", k)
+        else:
+            keep.append(p)
     if found:
         r = gs("set", f"{schema}.custom-keybinding:{found}", "binding", binding)
         if r.returncode != 0:
             return False, f"gsettings set failed (exit {r.returncode}): {r.stderr.strip()}"
+        gs("set", schema, "custom-keybindings", str(keep))
         return True, f"Shortcut updated to {binding}"
     for i in range(100):
         p = f"/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom{i}/"
@@ -433,8 +442,8 @@ def _gnome(binding, cmd):
                 r2 = gs("set", f"{schema}.custom-keybinding:{p}", k, v)
                 if r2.returncode != 0:
                     return False, f"gsettings set {k} failed: {r2.stderr.strip()}"
-            exist.append(p)
-            r3 = gs("set", schema, "custom-keybindings", str(exist))
+            keep.append(p)
+            r3 = gs("set", schema, "custom-keybindings", str(keep))
             if r3.returncode != 0:
                 return False, f"gsettings set custom-keybindings failed: {r3.stderr.strip()}"
             return True, f"Shortcut set to {binding}"

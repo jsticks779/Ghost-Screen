@@ -284,15 +284,17 @@ export default function Docs() {
             <section id="config-wallpaper" className="mb-10">
               <h3 className="text-lg font-semibold mb-4">Wallpaper / Image / Video</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                You can set a custom background image, video, or solid color to appear on Ghost Screen.
+                You can set a custom background image, video, or solid color. Videos play on loop automatically.
               </p>
-              <CodeBlock label="Set an image or video as background" code="ghost-screen --set-bg /path/to/your/image.png" />
+              <CodeBlock label="Set an image as background" code="ghost-screen --set-bg /path/to/your/image.png" />
+              <CodeBlock label="Set a video as background (plays on loop)" code="ghost-screen --set-bg /path/to/your/video.mp4" />
               <CodeBlock label="Set a solid color background" code="ghost-screen --set-bg-color \\#ff0088" />
+              <CodeBlock label="Reset to default ghost screen" code="ghost-screen --reset-bg" />
               <p className="text-sm text-muted-foreground mb-4">
-                The background will be applied the next time you open Ghost Screen. Supported formats: PNG, JPG, GIF, MP4, WEBM.
+                The background will be applied the next time you open Ghost Screen. Supported formats: PNG, JPG, GIF, MP4, WEBM, AVI, MOV. Requires ffmpeg for video playback.
               </p>
               <TipBox>
-                You can also set these permanently by editing <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">~/.config/ghost-screen/ghost_screen.json</code>. Add <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">&quot;background_image&quot;: &quot;/path/to/file&quot;</code> to the config.
+                You can also edit <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">~/.config/ghost-screen/ghost_screen.json</code> directly. Set <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">&quot;background_image&quot;</code> to the path and <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">&quot;background_type&quot;</code> to <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">&quot;image&quot;</code> or <code className="text-accent text-xs font-mono bg-muted px-1.5 py-0.5 rounded">&quot;video&quot;</code>.
               </TipBox>
             </section>
 
@@ -352,7 +354,8 @@ ghost-screen --kill           Kill running instance
 ghost-screen --version        Show version
 ghost-screen --check          Check dependencies
 ghost-screen --shortcut COMBO Set toggle shortcut (e.g. Ctrl+Shift+G)
-ghost-screen --set-bg PATH    Set background image/video
+ghost-screen --set-bg PATH    Set background image or video
+ghost-screen --reset-bg       Reset background to default
 ghost-screen --set-bg-color C Set background color (e.g. #ff0088)
 ghost-screen --set-color K C  Set a color key (e.g. primary #00fff7)
 ghost-screen --autostart ...  Manage autostart (enable|disable|status)

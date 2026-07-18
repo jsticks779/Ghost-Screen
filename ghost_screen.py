@@ -182,9 +182,39 @@ def set_color_key(key, value):
 
 
 def set_bg(path):
-    cfg = load_config()
-    cfg["background_image"] = os.path.abspath(path)
-    save_config(cfg)
+    if not os.path.isfile(path):
+        print(f"  Error: file not found: {path}")
+        sys.exit(1)
+
+    VIDEO_EXTS = {".mp4", ".webm", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".m4v", ".mpg", ".mpeg"}
+    ext = os.path.splitext(path)[1].lower()
+
+    # Try video first if extension matches
+    if ext in VIDEO_EXTS:
+        try:
+            subprocess.run(["ffprobe", "-v", "error", path],
+                           capture_output=True, timeout=10, check=True)
+            cfg = load_config()
+            cfg["background_image"] = os.path.abspath(path)
+            cfg["background_type"] = "video"
+            save_config(cfg)
+            return
+        except Exception:
+            print(f"  Error: ffprobe could not read video file: {path}")
+            sys.exit(1)
+
+    # Try image
+    try:
+        from PIL import Image
+        Image.open(path).verify()
+        cfg = load_config()
+        cfg["background_image"] = os.path.abspath(path)
+        cfg["background_type"] = "image"
+        save_config(cfg)
+        return
+    except Exception:
+        print(f"  Error: not a valid image: {path}")
+        sys.exit(1)
 
 
 def set_bg_color(color):
@@ -200,6 +230,63 @@ def reset_config():
     if os.path.exists(path):
         os.remove(path)
     print("  Config reset to defaults.")
+
+
+def reset_bg():
+    cfg = load_config()
+    if "background_image" in cfg:
+        del cfg["background_image"]
+    if "background_type" in cfg:
+        del cfg["background_type"]
+    save_config(cfg)
+    print("  Background reset to default ghost screen.")
+
+
+class VideoReader:
+    def __init__(self, path, width, height):
+        self._running = True
+        self._latest = None
+        self._path = path
+        self._w = width
+        self._h = height
+        self._proc = None
+        self._start()
+
+    def _start(self):
+        import subprocess
+        self._proc = subprocess.Popen(
+            ["ffmpeg", "-re", "-stream_loop", "-1", "-i", self._path,
+             "-f", "rawvideo", "-pix_fmt", "rgb24",
+             "-s", f"{self._w}x{self._h}", "-"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**8)
+
+    def read_frame(self):
+        from PIL import Image
+        frame_size = self._w * self._h * 3
+        raw = self._proc.stdout.read(frame_size)
+        if len(raw) < frame_size:
+            self.close()
+            self._start()
+            raw = self._proc.stdout.read(frame_size)
+            if len(raw) < frame_size:
+                return None
+        self._latest = Image.frombytes("RGB", (self._w, self._h), raw)
+        return self._latest
+
+    def get_frame(self):
+        return self._latest
+
+    def close(self):
+        if self._proc:
+            try:
+                self._proc.terminate()
+                self._proc.wait(timeout=2)
+            except Exception:
+                try:
+                    self._proc.kill()
+                except Exception:
+                    pass
+            self._proc = None
 
 
 # ─── Shortcut management ───────────────────────────────────────────────
@@ -765,6 +852,7 @@ class GhostScreen:
         self._inhibit_fd = None
         self._grab_active = False
         self._sleep_inhibited = False
+        self._video_reader = None
         self._acquire_inhibitor()
 
     def _init_particles(self):
@@ -796,6 +884,9 @@ class GhostScreen:
             f.write(str(os.getpid()))
 
     def _cleanup_pid(self):
+        if self._video_reader:
+            self._video_reader.close()
+            self._video_reader = None
         try:
             if os.path.exists(PID_FILE):
                 os.remove(PID_FILE)
@@ -895,6 +986,9 @@ class TkinterGhostScreen(GhostScreen):
         self._backend = "x11"
         self._root = None
         self._canvas = None
+        self._video_reader = None
+        self._bg_photo = None
+        self._bg_canvas_id = None
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
         if hasattr(signal, "SIGUSR1"):
             signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
@@ -926,13 +1020,25 @@ class TkinterGhostScreen(GhostScreen):
         )
         self._canvas.pack()
 
-        if self.cfg.get("background_image"):
+        bg_path = self.cfg.get("background_image")
+        bg_type = self.cfg.get("background_type", "image")
+        if bg_path and bg_type == "video":
+            try:
+                self._video_reader = VideoReader(bg_path, self.sw, self.sh)
+                from PIL import Image, ImageTk
+                frame = self._video_reader.read_frame()
+                if frame:
+                    self._bg_photo = ImageTk.PhotoImage(frame)
+                    self._bg_canvas_id = self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+            except Exception:
+                pass
+        elif bg_path:
             try:
                 from PIL import Image, ImageTk
-                img = Image.open(self.cfg["background_image"])
+                img = Image.open(bg_path)
                 img = img.resize((self.sw, self.sh), Image.LANCZOS)
                 self._bg_photo = ImageTk.PhotoImage(img)
-                self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+                self._bg_canvas_id = self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
             except Exception:
                 pass
 
@@ -999,6 +1105,19 @@ class TkinterGhostScreen(GhostScreen):
             self._canvas.delete("all")
         except Exception:
             return
+
+        # Update video background frame
+        if self._video_reader:
+            try:
+                from PIL import Image, ImageTk
+                frame = self._video_reader.read_frame()
+                if frame:
+                    self._bg_photo = ImageTk.PhotoImage(frame)
+                    self._bg_canvas_id = self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+            except Exception:
+                pass
+        elif self._bg_photo and self._bg_canvas_id is not None:
+            self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
 
         self._update()
         t = self.time
@@ -1209,6 +1328,8 @@ class GtkGhostScreen(GhostScreen):
         self._toggle_mods = 0
         self._toggle_keyval = 0
         self._toggle_hw_keycode = 0
+        self._bg_pil = None
+        self._gtk_video_reader = None
         self._init_toggle_key()
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
         if hasattr(signal, "SIGUSR1"):
@@ -1284,6 +1405,25 @@ class GtkGhostScreen(GhostScreen):
 
         self.particles = self._init_particles()
         self._write_pid()
+
+        if self.cfg.get("background_image"):
+            bg_type = self.cfg.get("background_type", "image")
+            if bg_type == "video":
+                try:
+                    self._gtk_video_reader = VideoReader(
+                        self.cfg["background_image"], self.sw, self.sh)
+                    frame = self._gtk_video_reader.read_frame()
+                    if frame:
+                        self._bg_pil = frame.convert("RGBA")
+                except Exception as e:
+                    self._write_sleep_log(f"Video background failed: {e}")
+            else:
+                try:
+                    from PIL import Image
+                    bg = Image.open(self.cfg["background_image"]).convert("RGBA")
+                    self._bg_pil = bg.resize((self.sw, self.sh), Image.LANCZOS)
+                except Exception as e:
+                    self._write_sleep_log(f"Background image failed: {e}")
 
     def _create_window(self):
         import gi
@@ -1412,6 +1552,9 @@ class GtkGhostScreen(GhostScreen):
         self._quit = True
 
     def _cleanup_inhibition(self):
+        if self._gtk_video_reader:
+            self._gtk_video_reader.close()
+            self._gtk_video_reader = None
         if self._touch_devs_inhibited:
             _restore_touch_devices()
             self._touch_devs_inhibited = False
@@ -1456,7 +1599,17 @@ class GtkGhostScreen(GhostScreen):
         scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
 
         from PIL import Image, ImageDraw
-        img = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
+        if self._gtk_video_reader:
+            try:
+                frame = self._gtk_video_reader.read_frame()
+                if frame:
+                    self._bg_pil = frame.convert("RGBA")
+            except Exception:
+                pass
+        if self._bg_pil:
+            img = self._bg_pil.copy()
+        else:
+            img = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
         self._draw_vignette(draw, t, c)
@@ -2005,6 +2158,8 @@ def main():
                         help="Set a color key (e.g. primary #00fff7)")
     parser.add_argument("--reset-config", action="store_true",
                         help="Reset configuration to defaults")
+    parser.add_argument("--reset-bg", action="store_true",
+                        help="Reset background image to default ghost screen")
     args = parser.parse_args()
 
     if args.set_bg:
@@ -2021,6 +2176,10 @@ def main():
 
     if args.reset_config:
         reset_config()
+        sys.exit(0)
+
+    if args.reset_bg:
+        reset_bg()
         sys.exit(0)
 
     if args.shortcut:

@@ -191,6 +191,9 @@ def set_bg(path):
 
     # Try video first if extension matches
     if ext in VIDEO_EXTS:
+        if not shutil.which("ffmpeg"):
+            print("  Error: video playback requires ffmpeg (not found)")
+            sys.exit(1)
         try:
             subprocess.run(["ffprobe", "-v", "error", path],
                            capture_output=True, timeout=10, check=True)
@@ -250,27 +253,43 @@ class VideoReader:
         self._w = width
         self._h = height
         self._proc = None
+        self._ffmpeg_ok = True
+        if not shutil.which("ffmpeg"):
+            print("  Warning: ffmpeg not found — video playback disabled")
+            self._ffmpeg_ok = False
+            return
         self._start()
 
     def _start(self):
         import subprocess
-        self._proc = subprocess.Popen(
-            ["ffmpeg", "-re", "-stream_loop", "-1", "-i", self._path,
-             "-f", "rawvideo", "-pix_fmt", "rgb24",
-             "-s", f"{self._w}x{self._h}", "-"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**8)
+        try:
+            self._proc = subprocess.Popen(
+                ["ffmpeg", "-re", "-stream_loop", "-1", "-i", self._path,
+                 "-f", "rawvideo", "-pix_fmt", "rgb24",
+                 "-s", f"{self._w}x{self._h}", "-"],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**8)
+        except Exception as e:
+            print(f"  Warning: ffmpeg failed to start: {e}")
+            self._ffmpeg_ok = False
 
     def read_frame(self):
+        if not self._ffmpeg_ok or not self._proc:
+            return None
         from PIL import Image
+        import select
         frame_size = self._w * self._h * 3
-        raw = self._proc.stdout.read(frame_size)
-        if len(raw) < frame_size:
-            self.close()
-            self._start()
+        try:
+            r, _, _ = select.select([self._proc.stdout], [], [], 0.1)
+            if not r:
+                return self._latest
             raw = self._proc.stdout.read(frame_size)
             if len(raw) < frame_size:
-                return None
-        self._latest = Image.frombytes("RGB", (self._w, self._h), raw)
+                self.close()
+                self._start()
+                return self._latest
+            self._latest = Image.frombytes("RGB", (self._w, self._h), raw)
+        except Exception:
+            return self._latest
         return self._latest
 
     def get_frame(self):
@@ -988,7 +1007,6 @@ class TkinterGhostScreen(GhostScreen):
         self._canvas = None
         self._video_reader = None
         self._bg_photo = None
-        self._bg_canvas_id = None
         signal.signal(signal.SIGTERM, lambda *_: self._signal_quit())
         if hasattr(signal, "SIGUSR1"):
             signal.signal(signal.SIGUSR1, lambda *_: self._signal_quit())
@@ -1025,11 +1043,12 @@ class TkinterGhostScreen(GhostScreen):
         if bg_path and bg_type == "video":
             try:
                 self._video_reader = VideoReader(bg_path, self.sw, self.sh)
-                from PIL import Image, ImageTk
-                frame = self._video_reader.read_frame()
-                if frame:
-                    self._bg_photo = ImageTk.PhotoImage(frame)
-                    self._bg_canvas_id = self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+                if self._video_reader._ffmpeg_ok:
+                    from PIL import Image, ImageTk
+                    frame = self._video_reader.read_frame()
+                    if frame:
+                        self._bg_photo = ImageTk.PhotoImage(frame)
+                        self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
             except Exception:
                 pass
         elif bg_path:
@@ -1038,9 +1057,9 @@ class TkinterGhostScreen(GhostScreen):
                 img = Image.open(bg_path)
                 img = img.resize((self.sw, self.sh), Image.LANCZOS)
                 self._bg_photo = ImageTk.PhotoImage(img)
-                self._bg_canvas_id = self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
-            except Exception:
-                pass
+                self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+            except Exception as e:
+                print(f"  Background image error: {e}")
 
         self._root.protocol("WM_DELETE_WINDOW", self._on_window_destroy)
         self._root.bind("<Destroy>", self._on_window_destroy)
@@ -1106,19 +1125,6 @@ class TkinterGhostScreen(GhostScreen):
         except Exception:
             return
 
-        # Update video background frame
-        if self._video_reader:
-            try:
-                from PIL import Image, ImageTk
-                frame = self._video_reader.read_frame()
-                if frame:
-                    self._bg_photo = ImageTk.PhotoImage(frame)
-                    self._bg_canvas_id = self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
-            except Exception:
-                pass
-        elif self._bg_photo and self._bg_canvas_id is not None:
-            self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
-
         self._update()
         t = self.time
         c = self.cfg["colors"]
@@ -1127,8 +1133,23 @@ class TkinterGhostScreen(GhostScreen):
         gy = cy + float_y
         scale = min(self.sw, self.sh) * self.cfg["ghost_scale"]
 
-        self._draw_vignette()
+        if not self.cfg.get("background_image"):
+            self._draw_vignette()
         self._draw_grid(t, cx, cy, c["grid"])
+
+        # Draw background image/video frame (after vignette so it's on top)
+        if self._video_reader:
+            try:
+                from PIL import Image, ImageTk
+                frame = self._video_reader.read_frame()
+                if frame:
+                    self._bg_photo = ImageTk.PhotoImage(frame)
+                    self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+            except Exception as e:
+                print(f"  Video frame error: {e}")
+        elif self._bg_photo:
+            self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+
         self._draw_rings(t, cx, gy, scale, c)
         self._draw_ghost(t, cx, gy, scale, c)
         self._draw_particles(t, c["particle"], c["primary"])

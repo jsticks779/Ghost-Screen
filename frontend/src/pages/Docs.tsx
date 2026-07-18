@@ -109,7 +109,7 @@ export default function Docs() {
         )}
 
         {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'fixed inset-y-0 left-0 z-50 w-64 shadow-xl' : 'hidden'} md:sticky md:top-17 md:block w-60 h-[calc(100vh-4.25rem)] flex-shrink-0 border-r border-border bg-background overflow-y-auto scrollbar-none`}>
+        <aside className={`${sidebarOpen ? 'fixed inset-y-0 left-0 z-50 w-64 shadow-xl' : 'hidden'} md:fixed md:top-17 md:block w-60 h-[calc(100vh-4.25rem)] flex-shrink-0 border-r border-border bg-background overflow-y-auto scrollbar-none`}>
           <nav className="px-4 py-6">
             {/* Mobile X button */}
             <div className="md:hidden flex items-center justify-between mb-4 pb-4 border-b border-border">
@@ -162,7 +162,7 @@ export default function Docs() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0 max-w-3xl mx-auto px-6 py-12">
+        <main className="flex-1 min-w-0 max-w-3xl mx-auto px-6 py-12 md:ml-60">
           {/* Intro */}
           <section id="intro" className="mb-20">
             <h1 className="text-3xl font-bold mb-2">Intro</h1>

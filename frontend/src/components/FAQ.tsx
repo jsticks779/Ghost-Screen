@@ -13,7 +13,7 @@ const faqs = [
   },
   {
     q: 'How do I toggle Ghost Screen?',
-    a: <>You can toggle Ghost Screen immediately just after install it by shortcut Ctrl+3 but you can change shortcut whenever you want. To change shortcut visit <Link to="/docs" className="text-accent underline underline-offset-2 hover:no-underline">Docs</Link>.</>,
+    a: <>You can toggle Ghost Screen immediately just after install it by shortcut Ctrl+3 but you can change shortcut whenever you want. To change shortcut visit <Link to="/docs#config-shortcut" className="text-accent underline underline-offset-2 hover:no-underline">Docs</Link>.</>,
   },
   {
     q: 'How do I install Ghost Screen in Windows?',

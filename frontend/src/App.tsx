@@ -23,8 +23,16 @@ export default function App() {
 
           <InstallSection />
 
-          <div className="max-w-lg mx-auto bg-card border border-border rounded-lg aspect-video flex items-center justify-center text-muted-foreground text-sm">
-            ▶ Ghost Screen in action
+          <div className="max-w-lg mx-auto bg-card border border-border rounded-lg overflow-hidden">
+            <video
+              src="/ghost-screen.mp4"
+              controls
+              muted
+              playsInline
+              className="w-full aspect-video object-cover"
+            >
+              Your browser does not support the video tag.
+            </video>
           </div>
         </div>
       </section>

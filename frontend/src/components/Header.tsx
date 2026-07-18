@@ -21,7 +21,7 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95">
+    <header className="sticky top-0 z-50 border-b border-border bg-background">
       <div className="flex items-center justify-between h-17 max-w-5xl mx-auto px-6">
         <Link to="/" className="flex items-center" onClick={() => setOpen(false)}>
           <Logo small />
@@ -45,13 +45,13 @@ export default function Header() {
         </button>
       </div>
 
-      <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${open ? 'max-h-64 border-t border-border' : 'max-h-0'}`}>
-        <div className="flex flex-col gap-4 px-6 py-5 bg-background">
+      <div className={`md:hidden absolute left-0 right-0 top-full overflow-hidden transition-all duration-300 ease-in-out ${open ? 'max-h-64 border-b border-border' : 'max-h-0'}`}>
+        <div className="flex flex-col items-center gap-4 px-6 py-5 bg-background">
           <Link to="/" onClick={() => setOpen(false)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"><House size={16} /> Home</Link>
           <a href="https://github.com/jsticks779/Ghost-Screen" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">GitHub</a>
           <Link to="/docs" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
           <a href="#faq" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
-          <button onClick={() => { toggleTheme(); setOpen(false) }} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors text-left">
+          <button onClick={() => { toggleTheme(); setOpen(false) }} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
             {dark ? <Sun size={16} /> : <Moon size={16} />} {dark ? 'Light' : 'Dark'} mode
           </button>
         </div>

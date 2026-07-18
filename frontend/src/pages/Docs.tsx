@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { ChevronDown, House, Menu, X } from 'lucide-react'
+import { ChevronDown, House, Menu, X, Copy, Check } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 
@@ -42,11 +42,19 @@ const sections = [
 ]
 
 function CodeBlock({ label, code }: { label?: string; code: string }) {
+  const [copied, setCopied] = useState(false)
   return (
     <div className="mb-6">
       {label && (
-        <div className="bg-muted rounded-t-lg border border-border border-b-0 px-4 py-2 text-xs text-muted-foreground font-mono">
-          {label}
+        <div className="bg-muted rounded-t-lg border border-border border-b-0 px-4 py-2 text-xs text-muted-foreground font-mono flex items-center justify-between">
+          <span>{label}</span>
+          <button
+            onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
         </div>
       )}
       <pre className={`text-sm bg-card border border-border ${label ? 'rounded-b-lg' : 'rounded-lg'} p-4 overflow-x-auto font-mono leading-relaxed scrollbar-none max-w-full`}>

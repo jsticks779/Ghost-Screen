@@ -398,37 +398,41 @@ def _load_shortcut_config():
 
 def _gnome(binding, cmd):
     schema = "org.gnome.settings-daemon.plugins.media-keys"
+    def gs(*args, **kw):
+        kw["capture_output"] = True
+        kw["text"] = True
+        kw["timeout"] = kw.get("timeout", 10)
+        r = subprocess.run(["gsettings"] + list(args), **kw)
+        return r
     try:
-        cur = subprocess.run(["gsettings", "get", schema, "custom-keybindings"],
-                             capture_output=True, text=True, timeout=10).stdout.strip()
+        cur = gs("get", schema, "custom-keybindings").stdout.strip()
     except Exception as e:
         return False, f"gsettings failed: {e}"
     import ast
     exist = ast.literal_eval(cur) if cur.startswith("[") else []
     found = None
     for p in exist:
-        c = subprocess.run(["gsettings", "get", f"{schema}.custom-keybinding:{p}", "command"],
-                           capture_output=True, text=True, timeout=5).stdout.strip().strip("'")
+        c = gs("get", f"{schema}.custom-keybinding:{p}", "command").stdout.strip().strip("'")
         if c == cmd:
             found = p
             break
     if found:
-        subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{found}", "binding", binding],
-                       timeout=10)
+        r = gs("set", f"{schema}.custom-keybinding:{found}", "binding", binding)
+        if r.returncode != 0:
+            return False, f"gsettings set failed (exit {r.returncode}): {r.stderr.strip()}"
         return True, f"Shortcut updated to {binding}"
     for i in range(100):
         p = f"/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom{i}/"
-        r = subprocess.run(["gsettings", "get", f"{schema}.custom-keybinding:{p}", "name"],
-                           capture_output=True, text=True, timeout=5)
+        r = gs("get", f"{schema}.custom-keybinding:{p}", "name")
         if r.stdout.strip() in ("''", "@as []", "") or r.returncode != 0:
-            subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{p}", "name", "Ghost Screen"],
-                           timeout=5)
-            subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{p}", "command", cmd],
-                           timeout=5)
-            subprocess.run(["gsettings", "set", f"{schema}.custom-keybinding:{p}", "binding", binding],
-                           timeout=5)
+            for k, v in [("name", "Ghost Screen"), ("command", cmd), ("binding", binding)]:
+                r2 = gs("set", f"{schema}.custom-keybinding:{p}", k, v)
+                if r2.returncode != 0:
+                    return False, f"gsettings set {k} failed: {r2.stderr.strip()}"
             exist.append(p)
-            subprocess.run(["gsettings", "set", schema, "custom-keybindings", str(exist)], timeout=5)
+            r3 = gs("set", schema, "custom-keybindings", str(exist))
+            if r3.returncode != 0:
+                return False, f"gsettings set custom-keybindings failed: {r3.stderr.strip()}"
             return True, f"Shortcut set to {binding}"
     return False, "No empty GNOME custom keybinding slot found"
 
@@ -438,12 +442,16 @@ def _kde(combo_str, cmd):
     if not kw:
         return False, "kwriteconfig5 not found"
     try:
-        subprocess.run([kw, "--file", os.path.expanduser("~/.config/kglobalshortcutsrc"),
-                        "--group", "Ghost Screen", "--key", "Ghost Screen",
-                        f"_launch {cmd}"], timeout=10)
-        subprocess.run([kw, "--file", os.path.expanduser("~/.config/kglobalshortcutsrc"),
-                        "--group", "Ghost Screen", "--key", "Ghost Screen",
-                        combo_str], timeout=10)
+        r1 = subprocess.run([kw, "--file", os.path.expanduser("~/.config/kglobalshortcutsrc"),
+                         "--group", "Ghost Screen", "--key", "Ghost Screen",
+                         f"_launch {cmd}"], capture_output=True, text=True, timeout=10)
+        if r1.returncode != 0:
+            return False, f"kwriteconfig5 failed (exit {r1.returncode}): {r1.stderr.strip()}"
+        r2 = subprocess.run([kw, "--file", os.path.expanduser("~/.config/kglobalshortcutsrc"),
+                         "--group", "Ghost Screen", "--key", "Ghost Screen",
+                         combo_str], capture_output=True, text=True, timeout=10)
+        if r2.returncode != 0:
+            return False, f"kwriteconfig5 failed (exit {r2.returncode}): {r2.stderr.strip()}"
         qd = shutil.which("qdbus")
         if qd:
             subprocess.run([qd, "org.kde.kglobalaccel", "/kglobalaccel",
@@ -511,6 +519,9 @@ def _set_shortcut(combo):
     def _try_gnome():
         if not shutil.which("gsettings"):
             return False, "gsettings not available"
+        r = subprocess.run(["gsettings", "list-schemas"], capture_output=True, text=True, timeout=5)
+        if "org.gnome.settings-daemon.plugins.media-keys" not in r.stdout:
+            return False, "GNOME media-keys schema not found on this system"
         return _gnome(gnome_binding, cmd)
 
     def _try_kde():

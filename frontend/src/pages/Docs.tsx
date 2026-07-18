@@ -41,15 +41,6 @@ const sections = [
   },
 ]
 
-function flattenSections(secs: typeof sections): { id: string; label: string }[] {
-  const flat: { id: string; label: string }[] = []
-  for (const s of secs) {
-    flat.push({ id: s.id, label: s.label })
-    if (s.subs) for (const sub of s.subs) flat.push({ id: sub.id, label: sub.label })
-  }
-  return flat
-}
-
 function CodeBlock({ label, code }: { label?: string; code: string }) {
   return (
     <div className="mb-6">
@@ -78,8 +69,6 @@ export default function Docs() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [expanded, setExpanded] = useState<string[]>(['intro', 'installation', 'usage', 'configuration'])
   const location = useLocation()
-
-  const flatItems = flattenSections(sections)
 
   useEffect(() => {
     setSidebarOpen(false)

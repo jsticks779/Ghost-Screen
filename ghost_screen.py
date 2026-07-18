@@ -1202,10 +1202,11 @@ class TkinterGhostScreen(GhostScreen):
         elif self._bg_photo:
             self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
 
-        self._draw_rings(t, cx, gy, scale, c)
-        self._draw_ghost(t, cx, gy, scale, c)
-        self._draw_particles(t, c["particle"], c["primary"])
-        self._draw_hud(t, cx, gy, scale, c["accent"])
+        if not self.cfg.get("background_image"):
+            self._draw_rings(t, cx, gy, scale, c)
+            self._draw_ghost(t, cx, gy, scale, c)
+            self._draw_particles(t, c["particle"], c["primary"])
+            self._draw_hud(t, cx, gy, scale, c["accent"])
 
         if self._quit or self._root is None:
             return
@@ -1688,10 +1689,11 @@ class GtkGhostScreen(GhostScreen):
         if not self.cfg.get("background_image"):
             self._draw_vignette(draw, t, c)
         self._draw_grid(draw, t, cx, cy, c["grid"])
-        self._draw_rings(draw, t, cx, gy, scale, c)
-        self._draw_ghost(draw, t, cx, gy, scale, c)
-        self._draw_particles(draw, t, c["particle"], c["primary"])
-        self._draw_hud(draw, t, cx, gy, scale, c["accent"])
+        if not self.cfg.get("background_image"):
+            self._draw_rings(draw, t, cx, gy, scale, c)
+            self._draw_ghost(draw, t, cx, gy, scale, c)
+            self._draw_particles(draw, t, c["particle"], c["primary"])
+            self._draw_hud(draw, t, cx, gy, scale, c["accent"])
 
         pb = self._GdkPixbuf.Pixbuf.new_from_bytes(
             self._GLib.Bytes.new(img.tobytes()),

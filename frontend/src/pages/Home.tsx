@@ -16,7 +16,12 @@ export default function Home() {
     <>
       <Header />
 
-      <section className="pt-24 pb-12 px-6 text-center">
+      <section className="pt-24 pb-12 px-6 text-center relative">
+        <img
+          src="/shield.png"
+          alt=""
+          className="absolute right-4 sm:right-[10%] top-0 sm:top-8 w-10 sm:w-24 opacity-80 pointer-events-none select-none animate-shield-float"
+        />
         <div className="max-w-3xl mx-auto">
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight leading-tight mb-4">
             Secure your desktop with <span className="text-accent">Ghost Screen</span>.

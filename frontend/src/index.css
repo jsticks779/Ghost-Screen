@@ -105,3 +105,12 @@ body {
 .video-zoom video {
   animation: zoom-breathe 10s ease-in-out infinite;
 }
+
+@keyframes shield-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-shield-float {
+  animation: shield-float 3s ease-in-out infinite;
+}

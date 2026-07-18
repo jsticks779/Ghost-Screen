@@ -26,8 +26,9 @@ export default function App() {
           <div className="max-w-lg mx-auto bg-card border border-border rounded-lg overflow-hidden">
             <video
               src="/ghost-screen.mp4"
-              controls
+              autoPlay
               muted
+              loop
               playsInline
               className="w-full aspect-video object-cover"
             >

@@ -2,9 +2,14 @@ import { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 
 const installs = [
-  { label: 'pip', cmd: 'pip install ghost-screen' },
-  { label: 'git', cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\npip install -r requirements.txt' },
-  { label: 'curl', cmd: 'curl -fsSL https://ghost-screen.app/install | bash' },
+  {
+    label: 'Linux',
+    cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\n\n# Install tkinter (X11) or GTK3 (Wayland)\nsudo apt install python3-tk\n\npython ghost_screen.py',
+  },
+  {
+    label: 'Windows',
+    cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\n\npython ghost_screen.py',
+  },
 ]
 
 export default function InstallSection() {

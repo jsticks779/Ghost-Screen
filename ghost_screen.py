@@ -506,35 +506,27 @@ def _set_shortcut(combo):
     cmd = _get_cmd_path()
     de = detect_de()
     combo_str = "+".join(mods + [key])
+    gnome_binding = _combo_to_gnome(mods, key)
 
-    def _gnome_h():
-        return _gnome(_combo_to_gnome(mods, key), cmd)
+    def _try_gnome():
+        if not shutil.which("gsettings"):
+            return False, "gsettings not available"
+        return _gnome(gnome_binding, cmd)
 
-    def _deepin_h():
-        return _gnome(_combo_to_gnome(mods, key), cmd)
-
-    def _kde_h():
+    def _try_kde():
+        if not shutil.which("kwriteconfig5"):
+            return False, "kwriteconfig5 not available"
         return _kde(combo_str, cmd)
 
-    def _xfce_h():
-        return _xfce(_combo_to_gnome(mods, key), cmd)
+    def _try_xfce():
+        if not shutil.which("xfconf-query"):
+            return False, "xfconf-query not available"
+        return _xfce(gnome_binding, cmd)
 
-    def _sway_h():
-        k = key.lower() if key.isalpha() else key
-        return _wlroots_cfg("sway", f"{'+'.join(mods)}+{k}",
-                            lambda c: f"bindsym {'+'.join(mods)}+{k} exec {c}")
+    def _try_wlroots(name, line_gen):
+        return _wlroots_cfg(name, f"{'+'.join(mods)}+{key}", line_gen)
 
-    def _hyprland_h():
-        ms = ", ".join(mods)
-        return _wlroots_cfg("hyprland", f"{ms}+{key}",
-                            lambda c: f"bind = {ms}, {key}, exec, {c}")
-
-    def _river_h():
-        ms = " ".join(mods)
-        return _wlroots_cfg("river", f"{ms}+{key}",
-                            lambda c: f'riverctl map normal {ms} {key} spawn "{c}" &')
-
-    def _lxqt_h():
+    def _try_lxqt():
         cfg = os.path.expanduser("~/.config/lxqt/globalkeyshortcuts.conf")
         if not os.path.exists(cfg):
             return False, "No LXQt config found"
@@ -546,7 +538,7 @@ def _set_shortcut(combo):
             f.writelines(filtered)
         return True, f"Shortcut set to {combo_str}"
 
-    def _xbindkeys_h():
+    def _try_xbindkeys():
         if os.environ.get("XDG_SESSION_TYPE") == "wayland":
             return False, "xbindkeys does not work on native Wayland"
         xbk = shutil.which("xbindkeys")
@@ -580,19 +572,52 @@ def _set_shortcut(combo):
         subprocess.run([xbk], timeout=5)
         return True, f"Shortcut set to {xc}"
 
-    handlers = {
-        "gnome": _gnome_h, "deepin": _deepin_h, "kde": _kde_h,
-        "xfce": _xfce_h, "sway": _sway_h, "hyprland": _hyprland_h,
-        "river": _river_h, "lxqt": _lxqt_h,
+    fallbacks = [
+        ("GNOME (gsettings)", _try_gnome),
+        ("KDE Plasma (kwriteconfig5)", _try_kde),
+        ("XFCE (xfconf-query)", _try_xfce),
+    ]
+    wlroots_candidates = [
+        ("sway", lambda: _try_wlroots("sway",
+            lambda c: f"bindsym {'+'.join(mods)}+{key.lower() if key.isalpha() else key} exec {c}")),
+        ("hyprland", lambda: _try_wlroots("hyprland",
+            lambda c: f"bind = {', '.join(mods)}, {key}, exec, {c}")),
+        ("river", lambda: _try_wlroots("river",
+            lambda c: f'riverctl map normal {" ".join(mods)} {key} spawn "{c}" &')),
+    ]
+    wlroots_paths = {
+        "sway": os.path.expanduser("~/.config/sway/config"),
+        "hyprland": os.path.expanduser("~/.config/hypr/hyprland.conf"),
+        "river": os.path.expanduser("~/.config/river/init"),
     }
 
-    if de and de in handlers:
-        ok, msg = handlers[de]()
-    elif de == "cosmic":
-        return False, "COSMIC desktop not yet supported for --shortcut"
+    if de == "cosmic":
+        ok, msg = False, "COSMIC desktop not yet supported for --shortcut"
     else:
-        ok, msg = _xbindkeys_h() if os.environ.get("XDG_SESSION_TYPE") != "wayland" \
-            else (False, "Could not detect desktop environment")
+        ok, msg = False, "Could not set shortcut with any available method"
+        for name, fn in fallbacks:
+            r, m = fn()
+            if r:
+                ok, msg = True, f"Shortcut set via {name}"
+                break
+        if not ok:
+            for name, fn in wlroots_candidates:
+                p = wlroots_paths.get(name)
+                if p and os.path.exists(p):
+                    r, m = fn()
+                    if r:
+                        ok, msg = True, f"Shortcut set via {name}"
+                        break
+        if not ok:
+            r, m = _try_lxqt()
+            if r:
+                ok, msg = True, "Shortcut set via LXQt"
+        if not ok:
+            r, m = _try_xbindkeys()
+            if r:
+                ok, msg = True, "Shortcut set via xbindkeys"
+            else:
+                msg = m
 
     if ok:
         _save_shortcut_config(combo_str, de or "x11")
@@ -806,7 +831,10 @@ def _restore_touch_devices():
     _INHIBITED_DEVS = []
 
 def _find_helper(name):
-    d = os.path.dirname(os.path.abspath(__file__))
+    try:
+        d = os.path.dirname(os.path.abspath(__file__))
+    except NameError:
+        d = os.path.dirname(os.path.abspath(sys.argv[0]))
     candidates = [os.path.join(d, name),
                   os.path.join(os.path.expanduser("~/.local/bin"), name),
                   os.path.join("/usr/local/bin", name)]

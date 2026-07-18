@@ -30,7 +30,7 @@ export default function Home() {
             Use any shortcut you like to lock and unlock your screen any time.
             Use any wallpaper, video or image you like.
             After installation, Ghost Screen uses <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted border border-border rounded">Ctrl</kbd>+<kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted border border-border rounded">3</kbd> by default — you can change it to whatever you want.
-            Works on Linux &amp; Windows.
+            Works on Linux{/* &amp; Windows */}.
           </p>
 
           <InstallSection />

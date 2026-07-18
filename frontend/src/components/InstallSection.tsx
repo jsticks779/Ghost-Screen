@@ -6,10 +6,10 @@ const installs = [
     label: 'Linux',
     cmd: "curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.sh | bash",
   },
-  {
-    label: 'Windows',
-    cmd: 'powershell -c "irm https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1 | iex"',
-  },
+  // {
+  //   label: 'Windows',
+  //   cmd: 'powershell -c "irm https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1 | iex"',
+  // },
 ]
 
 export default function InstallSection() {

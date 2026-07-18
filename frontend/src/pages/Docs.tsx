@@ -14,7 +14,7 @@ const sections = [
     label: 'Installation',
     subs: [
       { id: 'install-linux', label: 'Linux' },
-      { id: 'install-windows', label: 'Windows' },
+      // { id: 'install-windows', label: 'Windows' },
     ],
   },
   {
@@ -166,7 +166,7 @@ export default function Docs() {
             <p className="text-base text-muted-foreground mb-6">Get started with Ghost Screen.</p>
             <p className="text-sm text-muted-foreground mb-10 leading-relaxed">
               Ghost Screen is an open source desktop overlay that secures your screen with a single shortcut.
-              It works on Linux and Windows with zero external dependencies.
+              It works on Linux{/* and Windows */} with zero external dependencies.
             </p>
 
             <div className="mb-8 rounded-lg overflow-hidden border border-border">
@@ -197,7 +197,7 @@ export default function Docs() {
             </section>
 
             {/* Windows */}
-            <section id="install-windows" className="mb-12">
+            {/* <section id="install-windows" className="mb-12">
               <h3 className="text-lg font-semibold mb-4">Windows</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Open Command Prompt or PowerShell as administrator and paste the command below.
@@ -208,7 +208,7 @@ export default function Docs() {
               </p>
               <h4 className="text-sm font-medium text-accent mb-2">Uninstall</h4>
               <CodeBlock label="PowerShell" code='powershell -c "Remove-Item -Recurse \"$env:LOCALAPPDATA\GhostScreen\" -Force"' />
-            </section>
+            </section> */}
           </section>
 
           <hr className="border-border mb-20" />

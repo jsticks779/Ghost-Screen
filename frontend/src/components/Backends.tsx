@@ -1,37 +1,41 @@
+import { Badge } from '@/components/ui/badge'
+
 const backends = [
-  { platform: 'Windows', backend: 'tkinter + ctypes', blocking: 'WH_KEYBOARD_LL / WH_MOUSE_LL hooks', deps: 'Built into Python — none needed' },
-  { platform: 'Linux (X11)', backend: 'tkinter', blocking: 'grab_set_global()', deps: 'python3-tk' },
-  { platform: 'Linux (Wayland)', backend: 'GTK3 + Pillow', blocking: 'zwp_keyboard_shortcuts_inhibit + seat grab', deps: 'python3-gi, gir1.2-gtk-3.0, python3-pil' },
+  { name: 'X11 (Linux)', deps: 'tkinter', status: 'Stable' },
+  { name: 'Wayland (Linux)', deps: 'GTK3 (gir)', status: 'Stable' },
+  { name: 'Windows', deps: 'tkinter + ctypes', status: 'Stable' },
 ]
 
 export default function Backends() {
   return (
-    <section className="section" id="backends">
-      <h2 className="section-title">Platform Support</h2>
-      <p className="section-sub">
-        Ghost Screen auto-detects your platform and picks the right backend.
-      </p>
-      <div className="container" style={{ overflowX: 'auto' }}>
-        <table className="backends-table">
-          <thead>
-            <tr>
-              <th>Platform</th>
-              <th>Backend</th>
-              <th>Input Blocking</th>
-              <th>Dependencies</th>
-            </tr>
-          </thead>
-          <tbody>
-            {backends.map(b => (
-              <tr key={b.platform}>
-                <td>{b.platform}</td>
-                <td>{b.backend}</td>
-                <td>{b.blocking}</td>
-                <td>{b.deps}</td>
+    <section className="py-24 px-6 border-t border-border" id="backends">
+      <div className="max-w-3xl mx-auto">
+        <h2 className="text-3xl font-bold text-center mb-4">Platforms</h2>
+        <p className="text-muted-foreground text-center max-w-xl mx-auto mb-12">
+          Ghost Screen auto-detects your platform and uses the appropriate backend.
+        </p>
+        <div className="overflow-hidden border border-border rounded-lg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted">
+                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Platform</th>
+                <th className="text-left px-5 py-3 font-medium text-muted-foreground hidden sm:table-cell">Dependencies</th>
+                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {backends.map(b => (
+                <tr key={b.name} className="border-t border-border">
+                  <td className="px-5 py-3.5 font-medium text-accent">{b.name}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">{b.deps}</td>
+                  <td className="px-5 py-3.5 text-right">
+                    <Badge variant="secondary" className="bg-accent-dim/30 text-accent border-0 font-mono text-xs">{b.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   )

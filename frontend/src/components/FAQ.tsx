@@ -1,53 +1,50 @@
-import { useState } from 'react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 
 const faqs = [
   {
     q: 'What is Ghost Screen?',
-    a: 'Ghost Screen is an open-source full-screen animated ghost overlay. It renders a cyberpunk holographic ghost on top of everything, blocking all input and preventing sleep — perfect as a screensaver or focus tool.',
+    a: 'Ghost Screen is a full-screen animated ghost overlay that functions as a screensaver. It covers all monitors with a cyberpunk holographic animation and blocks input until toggled off.',
   },
   {
-    q: 'How do I toggle it?',
-    a: 'Press Ctrl+3 to toggle the ghost on and off. On Windows, this is handled via a low-level keyboard hook. On Linux, it uses the system shortcut manager or the hook backend. You can change the shortcut with --shortcut "Ctrl+Shift+G".',
+    q: 'How do I toggle Ghost Screen?',
+    a: 'Press Ctrl+3 to toggle the ghost on and off. You can customize this shortcut in the config file.',
   },
   {
-    q: 'Does it work on Wayland?',
-    a: 'Yes! Ghost Screen fully supports Wayland via the GTK3 backend with zwp_keyboard_shortcuts_inhibit for input blocking. Tested on GNOME, KDE, Sway, Hyprland, River, COSMIC, and more.',
+    q: 'Does it work on Windows?',
+    a: 'Yes! Ghost Screen works on Windows using only Python\'s built-in tkinter and ctypes — no external dependencies needed.',
   },
   {
-    q: 'What dependencies does Windows need?',
-    a: 'None. The Windows backend uses only Python\'s built-in tkinter and ctypes modules. No pip install, no pywin32, no Pillow.',
+    q: 'Can I customize the appearance?',
+    a: 'Yes, you can change colors, opacity, animation speed, and particle count via a JSON config file.',
   },
   {
-    q: 'Does it prevent my PC from sleeping?',
-    a: 'While active, sleep and screen blanking are blocked via SetThreadExecutionState on Windows and D-Bus logind / systemd-inhibit on Linux. Toggle off (Ctrl+3) to allow sleep again.',
-  },
-  {
-    q: 'Can I customize the ghost appearance?',
-    a: 'Yes. Create a ghost_screen.json file to change colors, opacity, animation speed, particle count, ghost size, and more. See the README for the full config reference.',
-  },
-  {
-    q: 'Is it open source?',
-    a: 'Yes, Ghost Screen is MIT-licensed. The full source code is on GitHub.',
+    q: 'Is it free and open source?',
+    a: 'Yes, Ghost Screen is completely free and open source under the MIT license.',
   },
 ]
 
 export default function FAQ() {
-  const [open, setOpen] = useState<number | null>(null)
-
   return (
-    <section className="section" id="faq">
-      <h2 className="section-title">FAQ</h2>
-      <p className="section-sub">Common questions about Ghost Screen.</p>
-      <div className="faq-list">
-        {faqs.map((faq, i) => (
-          <div key={i} className="faq-item">
-            <button className="faq-question" onClick={() => setOpen(open === i ? null : i)}>
-              {faq.q}
-              <span className={`faq-arrow${open === i ? ' open' : ''}`}>▾</span>
-            </button>
-            {open === i && <div className="faq-answer">{faq.a}</div>}
-          </div>
-        ))}
+    <section className="py-24 px-6" id="faq">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-3xl font-bold text-center mb-12">FAQ</h2>
+        <Accordion className="w-full">
+          {faqs.map((faq, i) => (
+            <AccordionItem key={i}>
+              <AccordionTrigger className="text-left text-sm font-medium">
+                {faq.q}
+              </AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground leading-relaxed">
+                {faq.a}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </div>
     </section>
   )

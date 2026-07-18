@@ -1,16 +1,14 @@
 import { useState } from 'react'
+import { Copy, Check } from 'lucide-react'
 
-const installs = {
-  curl: { label: 'curl', cmd: 'curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.sh | bash' },
-  npm: { label: 'npm', cmd: 'npm install -g ghost-screen' },
-  powershell: { label: 'PowerShell', cmd: 'powershell -Command "iex ((New-Object Net.WebClient).DownloadString(\'https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1\'))"' },
-  git: { label: 'git', cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\npython ghost_screen.py' },
-}
-
-type Key = keyof typeof installs
+const installs = [
+  { label: 'pip', cmd: 'pip install ghost-screen' },
+  { label: 'git', cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\npip install -r requirements.txt' },
+  { label: 'curl', cmd: 'curl -fsSL https://ghost-screen.app/install | bash' },
+]
 
 export default function InstallSection() {
-  const [tab, setTab] = useState<Key>('curl')
+  const [tab, setTab] = useState(0)
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -20,22 +18,29 @@ export default function InstallSection() {
   }
 
   return (
-    <div className="install-section">
-      <div className="install-tabs">
-        {(Object.keys(installs) as Key[]).map(k => (
+    <div className="max-w-md mx-auto mb-12">
+      <div className="flex border border-border rounded-t-lg overflow-hidden">
+        {installs.map((item, i) => (
           <button
-            key={k}
-            className={`install-tab${tab === k ? ' active' : ''}`}
-            onClick={() => { setTab(k); setCopied(false) }}
+            key={item.label}
+            onClick={() => { setTab(i); setCopied(false) }}
+            className={`flex-1 px-4 py-2.5 text-xs font-medium transition-colors font-mono ${
+              tab === i
+                ? 'bg-card text-accent'
+                : 'bg-muted text-muted-foreground hover:text-foreground'
+            } ${i > 0 ? 'border-l border-border' : ''}`}
           >
-            {installs[k].label}
+            {item.label}
           </button>
         ))}
       </div>
-      <div className="install-block">
-        <code>{installs[tab].cmd}</code>
-        <button className={`copy-btn${copied ? ' copied' : ''}`} onClick={handleCopy}>
-          {copied ? 'Copied' : 'Copy'}
+      <div className="flex items-center justify-between bg-card border border-t-0 border-border rounded-b-lg px-5 py-3">
+        <code className="text-sm text-accent font-mono whitespace-pre-wrap">{installs[tab].cmd}</code>
+        <button
+          onClick={handleCopy}
+          className="ml-3 p-1.5 text-muted-foreground hover:text-accent transition-colors flex-shrink-0"
+        >
+          {copied ? <Check size={16} /> : <Copy size={16} />}
         </button>
       </div>
     </div>

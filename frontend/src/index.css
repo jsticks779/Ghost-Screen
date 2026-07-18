@@ -30,7 +30,7 @@
 
 html { scroll-behavior: smooth; }
 
-:root {
+:root.dark {
   --background: #0a0a0c;
   --foreground: #e8e8ed;
   --card: #1a1a22;
@@ -49,6 +49,28 @@ html { scroll-behavior: smooth; }
   --border: #2a2a35;
   --input: #2a2a35;
   --ring: #00fff7;
+  --radius: 0.5rem;
+}
+
+:root.light {
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --primary: #00a8a0;
+  --primary-foreground: #ffffff;
+  --secondary: #e8e8ed;
+  --secondary-foreground: #1d1d1f;
+  --muted: #e8e8ed;
+  --muted-foreground: #6e6e73;
+  --accent: #00a8a0;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --border: #d2d2d7;
+  --input: #d2d2d7;
+  --ring: #00a8a0;
   --radius: 0.5rem;
 }
 

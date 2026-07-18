@@ -51,6 +51,8 @@ else
 fi
 
 CMD="$BIN/$NAME"
+PY_CMD="$BIN/${SCRIPT%.py}"  # ghost-screen.py (without .py? no, keep .py)
+PY_SCRIPT="$BIN/$SCRIPT"      # ghost-screen.py
 
 # ── Package manager auto-detection ─────────────────────────────────────
 
@@ -235,7 +237,29 @@ echo "    Display server: $display_type"
 # ── Install files ─────────────────────────────────────────────────────
 
 mkdir -p "$BIN" "$APP" "$AUTOSTART"
-cp "$DIR/$SCRIPT" "$CMD"
+# Install Python script
+cp "$DIR/$SCRIPT" "$BIN/$SCRIPT"
+chmod +x "$BIN/$SCRIPT"
+# Install bash wrapper for fast toggle
+cat > "$CMD" << 'WRAPEOF'
+#!/bin/bash
+PID_FILE="/tmp/ghost_screen.pid"
+PY_SCRIPT="BIN_PLACEHOLDER/ghost_screen.py"
+
+if [ $# -eq 0 ]; then
+    # Fast toggle: check PID file without starting Python
+    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+        kill $(cat "$PID_FILE") 2>/dev/null
+        rm -f "$PID_FILE"
+        echo "Ghost screen dismissed."
+    else
+        exec python3 "$PY_SCRIPT"
+    fi
+else
+    exec python3 "$PY_SCRIPT" "$@"
+fi
+WRAPEOF
+sed -i "s|BIN_PLACEHOLDER|$BIN|g" "$CMD"
 chmod +x "$CMD"
 
 # Build and install Wayland shortcut inhibitor (C shared library)

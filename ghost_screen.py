@@ -374,6 +374,10 @@ def detect_de():
 
 
 def _get_cmd_path():
+    d = os.path.dirname(os.path.abspath(__file__))
+    wrapper = os.path.join(d, "ghost-screen")
+    if os.path.exists(wrapper):
+        return wrapper
     if "/" in sys.argv[0]:
         return os.path.abspath(sys.argv[0])
     w = shutil.which(sys.argv[0])
@@ -1090,29 +1094,6 @@ class TkinterGhostScreen(GhostScreen):
         )
         self._canvas.pack()
 
-        bg_path = self.cfg.get("background_image")
-        bg_type = self.cfg.get("background_type", "image")
-        if bg_path and bg_type == "video":
-            try:
-                self._video_reader = VideoReader(bg_path, self.sw, self.sh)
-                if self._video_reader._ffmpeg_ok:
-                    from PIL import Image, ImageTk
-                    frame = self._video_reader.wait_for_frame(2.0)
-                    if frame:
-                        self._bg_photo = ImageTk.PhotoImage(frame)
-                        self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
-            except Exception:
-                pass
-        elif bg_path:
-            try:
-                from PIL import Image, ImageTk
-                img = Image.open(bg_path)
-                img = img.resize((self.sw, self.sh), Image.LANCZOS)
-                self._bg_photo = ImageTk.PhotoImage(img)
-                self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
-            except Exception as e:
-                print(f"  Background image error: {e}")
-
         self._root.protocol("WM_DELETE_WINDOW", self._on_window_destroy)
         self._root.bind("<Destroy>", self._on_window_destroy)
 
@@ -1121,7 +1102,33 @@ class TkinterGhostScreen(GhostScreen):
             self._write_pid()
 
         self._grab_input()
-        self._after_id = self._root.after(100, self._draw)
+        self._after_id = self._root.after(10, self._first_draw)
+
+    def _first_draw(self):
+        if self._quit or self._root is None:
+            return
+        self._update()
+        bg_path = self.cfg.get("background_image")
+        bg_type = self.cfg.get("background_type", "image")
+        if bg_path and bg_type == "video":
+            try:
+                self._video_reader = VideoReader(bg_path, self.sw, self.sh)
+                if self._video_reader._ffmpeg_ok:
+                    from PIL import Image, ImageTk
+                    frame = self._video_reader.wait_for_frame(0.5)
+                    if frame:
+                        self._bg_photo = ImageTk.PhotoImage(frame)
+            except Exception:
+                pass
+        elif bg_path:
+            try:
+                from PIL import Image, ImageTk
+                img = Image.open(bg_path)
+                img = img.resize((self.sw, self.sh), Image.LANCZOS)
+                self._bg_photo = ImageTk.PhotoImage(img)
+            except Exception as e:
+                print(f"  Background image error: {e}")
+        self._draw()
 
     def _grab_input(self):
         try:
@@ -1414,6 +1421,8 @@ class GtkGhostScreen(GhostScreen):
         gi.require_version("Gtk", "3.0")
         from gi.repository import GLib
         GLib.timeout_add(self.cfg["frame_delay"], self._tick)
+        # Load background asynchronously after window is shown
+        GLib.idle_add(self._load_background)
 
     def _init_toggle_key(self):
         import gi
@@ -1480,24 +1489,27 @@ class GtkGhostScreen(GhostScreen):
         self.particles = self._init_particles()
         self._write_pid()
 
-        if self.cfg.get("background_image"):
-            bg_type = self.cfg.get("background_type", "image")
-            if bg_type == "video":
-                try:
-                    self._gtk_video_reader = VideoReader(
-                        self.cfg["background_image"], self.sw, self.sh)
-                    frame = self._gtk_video_reader.wait_for_frame(2.0)
-                    if frame:
-                        self._bg_pil = frame.convert("RGBA")
-                except Exception as e:
-                    self._write_sleep_log(f"Video background failed: {e}")
-            else:
-                try:
-                    from PIL import Image
-                    bg = Image.open(self.cfg["background_image"]).convert("RGBA")
-                    self._bg_pil = bg.resize((self.sw, self.sh), Image.LANCZOS)
-                except Exception as e:
-                    self._write_sleep_log(f"Background image failed: {e}")
+    def _load_background(self):
+        if not self.cfg.get("background_image"):
+            return False
+        bg_type = self.cfg.get("background_type", "image")
+        if bg_type == "video":
+            try:
+                self._gtk_video_reader = VideoReader(
+                    self.cfg["background_image"], self.sw, self.sh)
+                frame = self._gtk_video_reader.wait_for_frame(0.5)
+                if frame:
+                    self._bg_pil = frame.convert("RGBA")
+            except Exception as e:
+                self._write_sleep_log(f"Video background failed: {e}")
+        else:
+            try:
+                from PIL import Image
+                bg = Image.open(self.cfg["background_image"]).convert("RGBA")
+                self._bg_pil = bg.resize((self.sw, self.sh), Image.LANCZOS)
+            except Exception as e:
+                self._write_sleep_log(f"Background image failed: {e}")
+        return False
 
     def _create_window(self):
         import gi

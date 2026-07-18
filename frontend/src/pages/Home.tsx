@@ -1,8 +1,6 @@
 import Header from '@/components/Header'
 import InstallSection from '@/components/InstallSection'
 import Features from '@/components/Features'
-import Backends from '@/components/Backends'
-import Stats from '@/components/Stats'
 import FAQ from '@/components/FAQ'
 import Footer from '@/components/Footer'
 
@@ -41,8 +39,6 @@ export default function Home() {
       </section>
 
       <Features />
-      <Backends />
-      <Stats />
       <FAQ />
       <Footer />
     </>

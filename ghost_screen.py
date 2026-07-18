@@ -160,6 +160,48 @@ def merge_config(cfg):
     return merged
 
 
+def save_config(cfg):
+    path = CONFIG_FILE_USER
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(cfg, f, indent=2)
+    print(f"  Config saved to {path}")
+
+
+def set_color_key(key, value):
+    cfg = load_config()
+    merged = DEFAULT_CONFIG.copy()
+    merged.update(cfg)
+    if key in merged.get("colors", {}):
+        if "colors" not in cfg:
+            cfg["colors"] = {}
+        cfg["colors"][key] = value
+    else:
+        cfg[key] = value
+    save_config(cfg)
+
+
+def set_bg(path):
+    cfg = load_config()
+    cfg["background_image"] = os.path.abspath(path)
+    save_config(cfg)
+
+
+def set_bg_color(color):
+    cfg = load_config()
+    if "colors" not in cfg:
+        cfg["colors"] = {}
+    cfg["colors"]["bg"] = color
+    save_config(cfg)
+
+
+def reset_config():
+    path = CONFIG_FILE_USER
+    if os.path.exists(path):
+        os.remove(path)
+    print("  Config reset to defaults.")
+
+
 # ─── Shortcut management ───────────────────────────────────────────────
 
 SHORTCUT_DIR = os.path.expanduser("~/.config/ghost-screen")
@@ -883,6 +925,16 @@ class TkinterGhostScreen(GhostScreen):
             highlightthickness=0, bg=self.cfg["colors"]["bg"],
         )
         self._canvas.pack()
+
+        if self.cfg.get("background_image"):
+            try:
+                from PIL import Image, ImageTk
+                img = Image.open(self.cfg["background_image"])
+                img = img.resize((self.sw, self.sh), Image.LANCZOS)
+                self._bg_photo = ImageTk.PhotoImage(img)
+                self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
+            except Exception:
+                pass
 
         self._root.protocol("WM_DELETE_WINDOW", self._on_window_destroy)
         self._root.bind("<Destroy>", self._on_window_destroy)
@@ -1945,7 +1997,31 @@ def main():
                         help="Manage autostart on login")
     parser.add_argument("--idle", type=int, metavar="MINUTES", default=0,
                         help="Auto-activate ghost after N minutes idle (screensaver mode)")
+    parser.add_argument("--set-bg", type=str, metavar="PATH",
+                        help="Set background image or video path")
+    parser.add_argument("--set-bg-color", type=str, metavar="COLOR",
+                        help="Set background color (e.g. #ff0088)")
+    parser.add_argument("--set-color", type=str, nargs=2, metavar=("KEY", "COLOR"),
+                        help="Set a color key (e.g. primary #00fff7)")
+    parser.add_argument("--reset-config", action="store_true",
+                        help="Reset configuration to defaults")
     args = parser.parse_args()
+
+    if args.set_bg:
+        set_bg(args.set_bg)
+        sys.exit(0)
+
+    if args.set_bg_color:
+        set_bg_color(args.set_bg_color)
+        sys.exit(0)
+
+    if args.set_color:
+        set_color_key(args.set_color[0], args.set_color[1])
+        sys.exit(0)
+
+    if args.reset_config:
+        reset_config()
+        sys.exit(0)
 
     if args.shortcut:
         ok, msg = _set_shortcut(args.shortcut)

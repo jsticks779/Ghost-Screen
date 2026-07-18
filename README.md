@@ -45,6 +45,12 @@ Open **PowerShell as Administrator** and paste:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1'))
 ```
 
+Or from **Command Prompt**:
+
+```cmd
+powershell -Command "iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1'))"
+```
+
 Or install manually:
 
 ```powershell
@@ -58,7 +64,7 @@ python ghost_screen.py
 |----------|---------|-------------------|
 | Linux X11 | `tkinter` | `python3-tk` |
 | Linux Wayland | GTK3 + Pillow | `python3-gi`, `gir1.2-gtk-3.0`, `python3-pil` |
-| Windows | tkinter + ctypes | Built into Python — no install needed |
+| Windows | tkinter + ctypes | Built into Python — no extra dependencies |
 
 After installing, press **Ctrl+3** to toggle the ghost on/off.
 
@@ -82,7 +88,7 @@ The **only** way to dismiss the ghost is pressing your shortcut again.
 
 While active, sleep + screen blanking are blocked automatically:
 
-- **Windows**: `SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)`
+- **Windows**: `SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)` — no dependencies needed
 - **Linux**: multi-backend — logind D-Bus → GNOME Session Manager → freedesktop PowerManagement → `systemd-inhibit` CLI
 
 All locks release on toggle-off or `--kill`.
@@ -108,7 +114,7 @@ The change persists across reboots. Works on GNOME, KDE, XFCE, Sway, Hyprland, R
 | **Sway** | `bindsym Ctrl+3 exec ~/.local/bin/ghost-screen` |
 | **Hyprland** | `bind = Ctrl, 3, exec, ~/.local/bin/ghost-screen` |
 | **River** | `riverctl map normal Ctrl 3 spawn "~/.local/bin/ghost-screen" &` |
-| **Windows** | Shortcut is handled internally via `RegisterHotKey` — no desktop setup needed |
+| **Windows** | Shortcut is handled internally via a low-level keyboard hook (`WH_KEYBOARD_LL`) — no desktop setup needed |
 
 ## Customization
 
@@ -158,19 +164,13 @@ npm uninstall -g ghost-screen   # if installed via npm
 Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
 ```
 
-### Windows
-
-```powershell
-Remove-Item -Recurse "$env:LOCALAPPDATA\GhostScreen"
-```
-
 ## How It Works
 
 `ghost_screen.py` auto-detects your platform and picks the right backend:
 
 | Platform | Backend | Window | Input Blocking | Sleep Lock |
 |----------|---------|--------|----------------|------------|
-| **Windows** | `pywin32` + Pillow | Layered transparent (`UpdateLayeredWindow`) | `WH_KEYBOARD_LL` / `WH_MOUSE_LL` hooks | `SetThreadExecutionState` |
+| **Windows** | `tkinter` + `ctypes` | Fullscreen overlay with `overrideredirect` | `WH_KEYBOARD_LL` / `WH_MOUSE_LL` hooks | `SetThreadExecutionState` |
 | **Linux (Wayland)** | GTK3 + Pillow | RGBA visual → GdkPixbuf | `zwp_keyboard_shortcuts_inhibit` + seat grab + kernel sysfs | D-Bus logind → systemd-inhibit |
 | **Linux (X11)** | `tkinter` | Fullscreen `-alpha` canvas | `grab_set_global()` | D-Bus logind → systemd-inhibit |
 

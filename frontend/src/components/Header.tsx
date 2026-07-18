@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95">
-      <div className="flex items-center justify-between h-14 max-w-5xl mx-auto px-6">
+      <div className="flex items-center justify-between h-16 max-w-5xl mx-auto px-6">
         <a href="#" className="flex items-center">
           <Logo small />
         </a>

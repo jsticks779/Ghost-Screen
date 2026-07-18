@@ -74,3 +74,15 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes zoom-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.video-zoom {
+  overflow: hidden;
+}
+.video-zoom video {
+  animation: zoom-breathe 8s ease-in-out infinite;
+}

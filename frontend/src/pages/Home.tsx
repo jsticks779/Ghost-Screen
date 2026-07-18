@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react'
 import Header from '@/components/Header'
 import InstallSection from '@/components/InstallSection'
 import Features from '@/components/Features'
@@ -5,6 +6,12 @@ import FAQ from '@/components/FAQ'
 import Footer from '@/components/Footer'
 
 export default function Home() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = 1.5
+  }, [])
+
   return (
     <>
       <Header />
@@ -24,16 +31,20 @@ export default function Home() {
           <InstallSection />
 
           <div className="max-w-lg mx-auto bg-card border border-border rounded-lg overflow-hidden">
-            <video
-              src="/ghost-screen.mp4"
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-full aspect-video object-cover"
-            >
-              Your browser does not support the video tag.
-            </video>
+            <div className="video-zoom w-full aspect-video">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full h-full object-cover"
+              >
+                <source src="/ghost-screen.webm" type="video/webm" />
+                <source src="/ghost-screen.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
           </div>
         </div>
       </section>

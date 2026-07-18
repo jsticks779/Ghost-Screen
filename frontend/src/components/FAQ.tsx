@@ -16,7 +16,7 @@ const faqs = [
     a: <>You can toggle Ghost Screen immediately just after install it by shortcut Ctrl+3 but you can change shortcut whenever you want. To change shortcut visit <Link to="/docs" className="text-accent underline underline-offset-2 hover:no-underline">Docs</Link>.</>,
   },
   {
-    q: 'How do I install Ghost Screen?',
+    q: 'How do I install Ghost Screen in Windows?',
     a: 'Yes you just need to copy link up there then paste it to your command prompt and then it installs Ghost Screen then boom your set.',
   },
   {

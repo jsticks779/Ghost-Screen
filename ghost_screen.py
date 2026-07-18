@@ -1747,11 +1747,8 @@ if sys.platform == "win32":
             self._uninstall_passive_hook()
 
         def _grab_input(self):
-            try:
-                self._root.grab_set_global()
-                self._grab_active = True
-            except Exception:
-                self._grab_active = False
+            # On Windows, hooks handle all input blocking — tk grab is not needed
+            self._grab_active = False
             combo = _get_toggle_combo()
             tk_ev = _combo_to_tk_event(combo)
             if tk_ev:
@@ -1809,11 +1806,7 @@ if sys.platform == "win32":
                     self._root.deiconify()
                 except Exception:
                     pass
-                try:
-                    self._root.grab_set_global()
-                    self._grab_active = True
-                except Exception:
-                    self._grab_active = False
+                self._grab_active = False
                 try:
                     self._root.lift()
                 except Exception:

@@ -583,56 +583,55 @@ def _set_shortcut(combo):
         subprocess.run([xbk], timeout=5)
         return True, f"Shortcut set to {xc}"
 
-    fallbacks = [
-        ("GNOME (gsettings)", _try_gnome),
-        ("KDE Plasma (kwriteconfig5)", _try_kde),
-        ("XFCE (xfconf-query)", _try_xfce),
-    ]
-    wlroots_candidates = [
-        ("sway", lambda: _try_wlroots("sway",
-            lambda c: f"bindsym {'+'.join(mods)}+{key.lower() if key.isalpha() else key} exec {c}")),
-        ("hyprland", lambda: _try_wlroots("hyprland",
-            lambda c: f"bind = {', '.join(mods)}, {key}, exec, {c}")),
-        ("river", lambda: _try_wlroots("river",
-            lambda c: f'riverctl map normal {" ".join(mods)} {key} spawn "{c}" &')),
-    ]
-    wlroots_paths = {
-        "sway": os.path.expanduser("~/.config/sway/config"),
-        "hyprland": os.path.expanduser("~/.config/hypr/hyprland.conf"),
-        "river": os.path.expanduser("~/.config/river/init"),
+    # wlroots sub-handlers
+    def _mk_sway():
+        k = key.lower() if key.isalpha() else key
+        return _try_wlroots("sway", lambda c: f"bindsym {'+'.join(mods)}+{k} exec {c}")
+    def _mk_hyprland():
+        return _try_wlroots("hyprland", lambda c: f"bind = {', '.join(mods)}, {key}, exec, {c}")
+    def _mk_river():
+        return _try_wlroots("river", lambda c: f'riverctl map normal {" ".join(mods)} {key} spawn "{c}" &')
+
+    de_handlers = {
+        "gnome": ("GNOME (gsettings)", _try_gnome),
+        "deepin": ("Deepin (gsettings)", _try_gnome),
+        "kde": ("KDE Plasma (kwriteconfig5)", _try_kde),
+        "xfce": ("XFCE (xfconf-query)", _try_xfce),
+        "sway": ("Sway", _mk_sway),
+        "hyprland": ("Hyprland", _mk_hyprland),
+        "river": ("River", _mk_river),
+        "lxqt": ("LXQt", _try_lxqt),
     }
 
     if de == "cosmic":
         ok, msg = False, "COSMIC desktop not yet supported for --shortcut"
     else:
-        ok, msg = False, "Could not set shortcut with any available method"
-        for name, fn in fallbacks:
-            r, m = fn()
-            if r:
-                ok, msg = True, f"Shortcut set via {name}"
-                break
-        if not ok:
-            for name, fn in wlroots_candidates:
-                p = wlroots_paths.get(name)
-                if p and os.path.exists(p):
-                    r, m = fn()
-                    if r:
-                        ok, msg = True, f"Shortcut set via {name}"
-                        break
-        if not ok:
-            r, m = _try_lxqt()
-            if r:
-                ok, msg = True, "Shortcut set via LXQt"
-        if not ok:
-            r, m = _try_xbindkeys()
-            if r:
-                ok, msg = True, "Shortcut set via xbindkeys"
-            else:
-                msg = m
+        # 1. Try detected DE's own method first
+        if de and de in de_handlers:
+            name, fn = de_handlers[de]
+            ok, _ = fn()
+            if ok:
+                msg = f"Shortcut set via {name}"
+                _save_shortcut_config(combo_str, de)
+                return True, msg
 
-    if ok:
-        _save_shortcut_config(combo_str, de or "x11")
-    return ok, msg
+        # 2. Try all other DE methods as fallback
+        for d, (name, fn) in de_handlers.items():
+            if d == de:
+                continue  # already tried
+            ok, _ = fn()
+            if ok:
+                msg = f"Shortcut set via {name}"
+                _save_shortcut_config(combo_str, de or d)
+                return True, msg
+
+        # 3. Last resort: xbindkeys
+        ok, msg = _try_xbindkeys()
+        if ok:
+            _save_shortcut_config(combo_str, de or "xbindkeys")
+            return True, f"Shortcut set via xbindkeys"
+
+    return False, msg
 
 
 # ─── Wayland input inhibition (GNOME: DBus Eval + keyboard shortcuts inhibitor) ─

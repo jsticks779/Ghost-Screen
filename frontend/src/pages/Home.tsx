@@ -31,14 +31,14 @@ export default function Home() {
           <InstallSection />
 
           <div className="max-w-lg mx-auto bg-card border border-border rounded-lg overflow-hidden">
-            <div className="video-zoom w-full aspect-video">
+            <div className="video-zoom relative" style={{ paddingBottom: '47.3%' }}>
               <video
                 ref={videoRef}
                 autoPlay
                 muted
                 loop
                 playsInline
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-contain"
               >
                 <source src="/ghost-screen.webm" type="video/webm" />
                 <source src="/ghost-screen.mp4" type="video/mp4" />

@@ -76,13 +76,10 @@ body {
 }
 
 @keyframes zoom-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
+  0%, 100% { transform: scale(1.05) translateX(0); }
+  50% { transform: scale(1.1) translateX(-2%); }
 }
 
-.video-zoom {
-  overflow: hidden;
-}
 .video-zoom video {
-  animation: zoom-breathe 8s ease-in-out infinite;
+  animation: zoom-breathe 10s ease-in-out infinite;
 }

@@ -38,6 +38,16 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="py-16 px-6 border-t border-border">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-2xl font-bold mb-3">Built for privacy first</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Ghost Screen runs entirely offline on your machine. No data, no keystrokes, no screen content
+            is ever sent anywhere. Everything stays local — because your desktop is yours alone.
+          </p>
+        </div>
+      </section>
+
       <Features />
       <FAQ />
       <Footer />

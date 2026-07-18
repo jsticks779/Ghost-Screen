@@ -4,11 +4,11 @@ import { Copy, Check } from 'lucide-react'
 const installs = [
   {
     label: 'Linux',
-    cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\n\n# Install tkinter (X11) or GTK3 (Wayland)\nsudo apt install python3-tk\n\npython ghost_screen.py',
+    cmd: "curl -fsSL https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.sh | bash",
   },
   {
     label: 'Windows',
-    cmd: 'git clone https://github.com/jsticks779/Ghost-Screen.git\ncd Ghost-Screen\n\npython ghost_screen.py',
+    cmd: 'powershell -c "irm https://raw.githubusercontent.com/jsticks779/Ghost-Screen/main/install.ps1 | iex"',
   },
 ]
 
@@ -40,7 +40,7 @@ export default function InstallSection() {
         ))}
       </div>
       <div className="flex items-center justify-between bg-card border border-t-0 border-border rounded-b-lg px-5 py-3">
-        <code className="text-sm text-accent font-mono whitespace-pre-wrap">{installs[tab].cmd}</code>
+        <code className="text-sm text-accent font-mono whitespace-nowrap overflow-x-auto scrollbar-none">{installs[tab].cmd}</code>
         <button
           onClick={handleCopy}
           className="ml-3 p-1.5 text-muted-foreground hover:text-accent transition-colors flex-shrink-0"

@@ -80,6 +80,18 @@ try {
 }
 
 Write-Host ""
+Write-Host "  ██████   ██   ██  ██████  ███████  ████████" -ForegroundColor Cyan
+Write-Host " ██       ██   ██ ██    ██ ██    ██ ██" -ForegroundColor Cyan
+Write-Host " ██   ███ ███████ ██    ██ ███████  ██████" -ForegroundColor Cyan
+Write-Host " ██    ██ ██   ██ ██    ██ ██    ██ ██" -ForegroundColor Cyan
+Write-Host "  ██████  ██   ██  ██████  ██    ██ ████████" -ForegroundColor Cyan
+Write-Host "" -ForegroundColor Cyan
+Write-Host " ███████   ██████  ██████   ███████  ███████  ███    ██" -ForegroundColor Cyan
+Write-Host " ██       ██    ██ ██   ██ ██    ██ ██       ████   ██" -ForegroundColor Cyan
+Write-Host " ███████  ██    ██ ██████  ██    ██ █████    ██ ██  ██" -ForegroundColor Cyan
+Write-Host "      ██ ██    ██ ██   ██ ██    ██ ██       ██  ██ ██" -ForegroundColor Cyan
+Write-Host " ███████   ██████  ██   ██ ███████  ███████  ██   ████" -ForegroundColor Cyan
+Write-Host ""
 Write-Host "  Ghost Screen installed!" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Press  Ctrl+3  to toggle the ghost on/off"

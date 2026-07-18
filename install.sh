@@ -580,16 +580,27 @@ fi
 # ── Done ──────────────────────────────────────────────────────────────
 
 echo ""
+echo "  ██████   ██   ██  ██████  ███████  ████████"
+echo " ██       ██   ██ ██    ██ ██    ██ ██"
+echo " ██   ███ ███████ ██    ██ ███████  ██████"
+echo " ██    ██ ██   ██ ██    ██ ██    ██ ██"
+echo "  ██████  ██   ██  ██████  ██    ██ ████████"
+echo ""
+echo " ███████   ██████  ██████   ███████  ███████  ███    ██"
+echo " ██       ██    ██ ██   ██ ██    ██ ██       ████   ██"
+echo " ███████  ██    ██ ██████  ██    ██ █████    ██ ██  ██"
+echo "      ██ ██    ██ ██   ██ ██    ██ ██       ██  ██ ██"
+echo " ███████   ██████  ██   ██ ███████  ███████  ██   ████"
+echo ""
 echo "  Ghost Screen installed!"
 echo ""
-
 if [ -n "$SHORTCUT_OK" ]; then
-    echo "  Press  Ctrl+3  to toggle the ghost on/off"
-    [ -n "$SHORTCUT_MSG" ] && echo "  $SHORTCUT_MSG"
+  echo "  Press  Ctrl+3  to toggle the ghost on/off"
+  [ -n "$SHORTCUT_MSG" ] && echo "  $SHORTCUT_MSG"
 else
-    echo "  Shortcut not set — do it manually:"
-    echo "    Settings -> Keyboard -> Shortcuts -> +"
-    echo "    Name: Ghost Screen,  Command: $CMD,  Shortcut: Ctrl+3"
+  echo "  Shortcut not set — do it manually:"
+  echo "    Settings -> Keyboard -> Shortcuts -> +"
+  echo "    Name: Ghost Screen,  Command: $CMD,  Shortcut: Ctrl+3"
 fi
 echo "  Kill: $CMD --kill"
 echo "  Check: $CMD --check"

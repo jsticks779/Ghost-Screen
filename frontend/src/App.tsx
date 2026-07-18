@@ -1,5 +1,4 @@
 import Header from './components/Header'
-import Logo from './components/Logo'
 import InstallSection from './components/InstallSection'
 import Features from './components/Features'
 import Backends from './components/Backends'
@@ -13,7 +12,6 @@ export default function App() {
       <Header />
 
       <section className="hero">
-        <div className="hero-logo"><Logo /></div>
         <h1>Animated tech <span>ghost overlay</span></h1>
         <p>
           Full-screen cyberpunk holographic screensaver for Linux &amp; Windows.

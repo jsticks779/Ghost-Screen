@@ -37,7 +37,7 @@ a:hover { text-decoration: underline; }
 }
 .header-inner {
   display: flex; align-items: center; justify-content: space-between;
-  height: 56px; max-width: var(--max-w); margin: 0 auto; padding: 0 24px;
+  height: 48px; max-width: var(--max-w); margin: 0 auto; padding: 0 24px;
 }
 .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--text); }
 .header-logo img { height: 28px; }
@@ -52,8 +52,6 @@ a:hover { text-decoration: underline; }
   position: relative;
   overflow: hidden;
 }
-.hero-logo { margin-bottom: 24px; }
-.hero-logo svg { width: 320px; height: auto; }
 .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px; }
 .hero h1 span { color: var(--accent); }
 .hero p { font-size: 18px; color: var(--text-muted); max-width: 600px; margin: 0 auto 40px; }
@@ -162,7 +160,6 @@ a:hover { text-decoration: underline; }
 /* Responsive */
 @media (max-width: 768px) {
   .hero h1 { font-size: 32px; }
-  .hero-logo svg { width: 220px; }
   .stats-grid { grid-template-columns: 1fr; }
   .header-nav { display: none; }
 }

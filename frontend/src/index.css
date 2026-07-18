@@ -123,3 +123,15 @@ body {
 .animate-blink {
   animation: blink 1s step-end infinite;
 }
+
+@keyframes flag-wave {
+  0%, 100% { transform: rotate(0deg) skewY(0deg); }
+  4% { transform: rotate(-1.5deg) skewY(-0.8deg); }
+  10% { transform: rotate(1.5deg) skewY(0.8deg); }
+  20% { transform: rotate(0deg) skewY(0deg); }
+}
+
+.animate-flag-wave {
+  animation: flag-wave 5s ease-in-out infinite;
+  animation-delay: 3s;
+}

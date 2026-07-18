@@ -24,7 +24,7 @@ export default function Home() {
         />
         <div className="max-w-3xl mx-auto">
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight leading-tight mb-4">
-            Secure your desktop with <span className="text-accent">Ghost Screen<span className="animate-blink text-accent ml-0.5 font-light">|</span></span>
+            Secure your desktop with <span className="text-accent">Ghost Screen<span className="animate-blink text-accent ml-0.5 font-light">|</span></span>.
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
             Use any shortcut you like to lock and unlock your screen any time.

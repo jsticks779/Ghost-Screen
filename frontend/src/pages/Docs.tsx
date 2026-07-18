@@ -93,8 +93,8 @@ export default function Docs() {
     <div className="min-h-screen flex flex-col">
       <Header />
 
-      {/* Mobile hamburger */}
-      <div className="md:hidden flex items-center justify-between border-b border-border px-4 py-3 bg-background">
+      {/* Mobile header */}
+      <div className="md:hidden sticky top-17 z-30 flex items-center justify-between border-b border-border px-4 py-3 bg-background">
         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted-foreground hover:text-foreground" aria-label="Menu">
           {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -109,13 +109,16 @@ export default function Docs() {
         )}
 
         {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'fixed inset-y-0 left-0 z-50 w-64 shadow-xl' : 'hidden'} md:sticky md:top-17 md:block w-60 h-[calc(100vh-4.25rem)] flex-shrink-0 border-r border-border bg-background overflow-y-auto`}>
+        <aside className={`${sidebarOpen ? 'fixed inset-y-0 left-0 z-50 w-64 shadow-xl' : 'hidden'} md:sticky md:top-17 md:block w-60 h-[calc(100vh-4.25rem)] flex-shrink-0 border-r border-border bg-background overflow-y-auto scrollbar-none`}>
           <nav className="px-4 py-6">
-            {/* Mobile Home link */}
-            <div className="md:hidden mb-4 pb-4 border-b border-border">
+            {/* Mobile X button */}
+            <div className="md:hidden flex items-center justify-between mb-4 pb-4 border-b border-border">
               <Link to="/" onClick={() => setSidebarOpen(false)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <House size={16} /> Home
               </Link>
+              <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-foreground" aria-label="Close menu">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="flex flex-col gap-1">

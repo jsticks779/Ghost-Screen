@@ -6,7 +6,6 @@ export default function Header() {
       <div className="header-inner">
         <a href="#" className="header-logo">
           <Logo small />
-          Ghost Screen
         </a>
         <nav className="header-nav">
           <a href="#features">Features</a>

@@ -579,18 +579,35 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────────────
 
-CYAN='\033[38;2;0;255;247m'
-RESET='\033[0m'
-
 echo ""
-printf "${CYAN}  ███  █   █  ███   ████ █████   ████  ███  ████  █████ █████ █   █${RESET}\n"
-printf "${CYAN} █   █ █   █ █   █ █       █    █     █   █ █   █ █     █     ██  █${RESET}\n"
-printf "${CYAN} █     █████ █   █  ███    █     ███  █     ████  ████  ████  █ █ █${RESET}\n"
-printf "${CYAN} █ ███ █   █ █   █     █   █        █ █     █ █   █     █     █  ██${RESET}\n"
-printf "${CYAN} █   █ █   █ █   █     █   █        █ █   █ █   █ █     █     █   █${RESET}\n"
-printf "${CYAN}  ███  █   █  ███  ████    █    ████   ███  █   █ █████ █████ █   █${RESET}\n"
-printf "${CYAN}       █   █               █                █   █             █   █${RESET}\n"
-echo ""
+# Render logo.svg in terminal with true-color cyan
+python3 - "$DIR/logo.svg" 2>/dev/null << 'PYEOF' || echo "  Ghost Screen"
+import xml.etree.ElementTree as ET, sys
+C = '\033[38;2;0;255;247m'; R = '\033[0m'
+try:
+    t = ET.parse(sys.argv[1])
+    r = t.getroot()
+    ns = {'svg': 'http://www.w3.org/2000/svg'}
+    letters = {}
+    for g in r.findall('.//svg:g', ns):
+        gid = g.get('id', '')
+        if gid.startswith('l') and gid[1:].isdigit():
+            pts = [(int(float(a.get('x', 0))), int(float(a.get('y', 0)))) for a in g.findall('svg:rect', ns)]
+            if pts: letters[int(gid[1:])] = pts
+    def render(idx):
+        pts = letters[idx]
+        mx = min(p[0] for p in pts); Mx = max(p[0] for p in pts) + 10
+        my = min(p[1] for p in pts); My = max(p[1] for p in pts) + 10
+        g = [[0] * ((Mx - mx) // 10) for _ in range((My - my) // 10)]
+        for x, y in pts: g[(y - my) // 10][(x - mx) // 10] = 1
+        return [''.join('█' if g[r_][c_] else ' ' for c_ in range(len(g[0]))) for r_ in range(len(g))] + [' ' * len(g[0])] * (7 - len(g))
+    grids = [render(i) for i in sorted(letters)]
+    gid = [0, 1, 2, 3, 4]; sid = [5, 6, 7, 8, 9, 10]
+    for row in range(7):
+        print(C + ' '.join(grids[i][row] for i in gid) + '  ' + ' '.join(grids[i][row] for i in sid) + R)
+except:
+    print('  Ghost Screen')
+PYEOF
 echo "  Ghost Screen installed!"
 echo ""
 if [ -n "$SHORTCUT_OK" ]; then

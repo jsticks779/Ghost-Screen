@@ -24,6 +24,11 @@ export default function InstallSection() {
 
   return (
     <div className="max-w-md mx-auto mb-12">
+      <p className="text-xs text-muted-foreground mb-2 text-center">
+        {installs[tab].label === 'Linux'
+          ? 'Paste this in your terminal'
+          : 'Paste this in Command Prompt'}
+      </p>
       <div className="flex border border-border rounded-t-lg overflow-hidden">
         {installs.map((item, i) => (
           <button

@@ -298,6 +298,16 @@ class VideoReader:
         with self._lock:
             return self._latest
 
+    def wait_for_frame(self, timeout=2.0):
+        import time
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self._lock:
+                if self._latest is not None:
+                    return self._latest
+            time.sleep(0.05)
+        return self._latest
+
     def close(self):
         self._running = False
         if self._proc:
@@ -1049,7 +1059,7 @@ class TkinterGhostScreen(GhostScreen):
                 self._video_reader = VideoReader(bg_path, self.sw, self.sh)
                 if self._video_reader._ffmpeg_ok:
                     from PIL import Image, ImageTk
-                    frame = self._video_reader.get_frame()
+                    frame = self._video_reader.wait_for_frame(2.0)
                     if frame:
                         self._bg_photo = ImageTk.PhotoImage(frame)
                         self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
@@ -1437,7 +1447,7 @@ class GtkGhostScreen(GhostScreen):
                 try:
                     self._gtk_video_reader = VideoReader(
                         self.cfg["background_image"], self.sw, self.sh)
-                    frame = self._gtk_video_reader.get_frame()
+                    frame = self._gtk_video_reader.wait_for_frame(2.0)
                     if frame:
                         self._bg_pil = frame.convert("RGBA")
                 except Exception as e:
@@ -1637,7 +1647,8 @@ class GtkGhostScreen(GhostScreen):
             img = Image.new("RGBA", (self.sw, self.sh), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        self._draw_vignette(draw, t, c)
+        if not self.cfg.get("background_image"):
+            self._draw_vignette(draw, t, c)
         self._draw_grid(draw, t, cx, cy, c["grid"])
         self._draw_rings(draw, t, cx, gy, scale, c)
         self._draw_ghost(draw, t, cx, gy, scale, c)

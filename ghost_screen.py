@@ -12,6 +12,7 @@ import shutil
 import atexit
 
 import tempfile
+import threading
 
 PROJECT = "Ghost Screen"
 VERSION = "1.0.0"
@@ -247,21 +248,22 @@ def reset_bg():
 
 class VideoReader:
     def __init__(self, path, width, height):
-        self._running = True
         self._latest = None
+        self._lock = threading.Lock()
+        self._running = True
         self._path = path
         self._w = width
         self._h = height
         self._proc = None
-        self._ffmpeg_ok = True
-        if not shutil.which("ffmpeg"):
+        self._ffmpeg_ok = bool(shutil.which("ffmpeg"))
+        if not self._ffmpeg_ok:
             print("  Warning: ffmpeg not found — video playback disabled")
-            self._ffmpeg_ok = False
             return
-        self._start()
+        self._start_ffmpeg()
+        self._thread = threading.Thread(target=self._reader, daemon=True)
+        self._thread.start()
 
-    def _start(self):
-        import subprocess
+    def _start_ffmpeg(self):
         try:
             self._proc = subprocess.Popen(
                 ["ffmpeg", "-re", "-stream_loop", "-1", "-i", self._path,
@@ -272,30 +274,32 @@ class VideoReader:
             print(f"  Warning: ffmpeg failed to start: {e}")
             self._ffmpeg_ok = False
 
-    def read_frame(self):
-        if not self._ffmpeg_ok or not self._proc:
-            return None
+    def _reader(self):
         from PIL import Image
-        import select
         frame_size = self._w * self._h * 3
-        try:
-            r, _, _ = select.select([self._proc.stdout], [], [], 0.1)
-            if not r:
-                return self._latest
-            raw = self._proc.stdout.read(frame_size)
-            if len(raw) < frame_size:
-                self.close()
-                self._start()
-                return self._latest
-            self._latest = Image.frombytes("RGB", (self._w, self._h), raw)
-        except Exception:
-            return self._latest
-        return self._latest
+        while self._running:
+            if not self._proc or self._proc.poll() is not None:
+                if self._running:
+                    self._start_ffmpeg()
+                continue
+            try:
+                raw = self._proc.stdout.read(frame_size)
+                if len(raw) < frame_size:
+                    self._proc.terminate()
+                    self._proc.wait(timeout=2)
+                    self._proc = None
+                    continue
+                with self._lock:
+                    self._latest = Image.frombytes("RGB", (self._w, self._h), raw)
+            except Exception:
+                break
 
     def get_frame(self):
-        return self._latest
+        with self._lock:
+            return self._latest
 
     def close(self):
+        self._running = False
         if self._proc:
             try:
                 self._proc.terminate()
@@ -1045,7 +1049,7 @@ class TkinterGhostScreen(GhostScreen):
                 self._video_reader = VideoReader(bg_path, self.sw, self.sh)
                 if self._video_reader._ffmpeg_ok:
                     from PIL import Image, ImageTk
-                    frame = self._video_reader.read_frame()
+                    frame = self._video_reader.get_frame()
                     if frame:
                         self._bg_photo = ImageTk.PhotoImage(frame)
                         self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
@@ -1141,7 +1145,7 @@ class TkinterGhostScreen(GhostScreen):
         if self._video_reader:
             try:
                 from PIL import Image, ImageTk
-                frame = self._video_reader.read_frame()
+                frame = self._video_reader.get_frame()
                 if frame:
                     self._bg_photo = ImageTk.PhotoImage(frame)
                     self._canvas.create_image(0, 0, anchor="nw", image=self._bg_photo)
@@ -1433,7 +1437,7 @@ class GtkGhostScreen(GhostScreen):
                 try:
                     self._gtk_video_reader = VideoReader(
                         self.cfg["background_image"], self.sw, self.sh)
-                    frame = self._gtk_video_reader.read_frame()
+                    frame = self._gtk_video_reader.get_frame()
                     if frame:
                         self._bg_pil = frame.convert("RGBA")
                 except Exception as e:
@@ -1622,7 +1626,7 @@ class GtkGhostScreen(GhostScreen):
         from PIL import Image, ImageDraw
         if self._gtk_video_reader:
             try:
-                frame = self._gtk_video_reader.read_frame()
+                frame = self._gtk_video_reader.get_frame()
                 if frame:
                     self._bg_pil = frame.convert("RGBA")
             except Exception:

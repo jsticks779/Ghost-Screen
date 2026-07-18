@@ -4,7 +4,7 @@ import Logo from './Logo'
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95">
-      <div className="flex items-center justify-between h-14 max-w-5xl mx-auto px-6">
+      <div className="flex items-center justify-between h-12 max-w-5xl mx-auto px-6">
         <Link to="/" className="flex items-center">
           <Logo small />
         </Link>

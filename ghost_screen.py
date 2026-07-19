@@ -1547,28 +1547,17 @@ class GtkGhostScreen(GhostScreen):
     def _grab_input(self):
         Gdk = self._Gdk
 
-        # 1. Try keyboard shortcuts inhibitor (C .so helper, Wayland protocol)
-        try:
-            blk = WaylandShortcutBlocker()
-            if blk._state:
-                self._shortcut_blocker = blk
-        except Exception:
-            pass
-
-        # 2. Inhibit all touch devices at kernel level (touchpad + touchscreen)
-        #    Works on EVERY Wayland compositor — not DE-specific.
+        # 1. Inhibit all touch devices at kernel level (touchpad + touchscreen)
         if _inhibit_touch_devices():
             self._touch_devs_inhibited = True
-        # Also try gsettings touchpad disable (GNOME-specific belt-and-suspenders)
         if _inhibit_touchpad():
             self._touchpad_disabled = True
 
-        # 3. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
-        if not self._shortcut_blocker:
-            if _inhibit_gnome_shortcuts():
-                self._gnome_restore = True
+        # 2. Try GNOME Shell Eval (blocks Super key, Alt+Tab)
+        if _inhibit_gnome_shortcuts():
+            self._gnome_restore = True
 
-        # 4. Inhibit screen blanking + idle suspend (try all standard backends)
+        # 3. Inhibit screen blanking + idle suspend
         cookie = _inhibit_gnome_session()
         if cookie:
             self._gnome_session_cookie = cookie

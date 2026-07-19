@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { ChevronDown, House, Menu, X, Copy, Check } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -88,6 +89,15 @@ export default function Docs() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Helmet>
+        <title>Documentation — Ghost Screen</title>
+        <meta name="description" content="Learn how to install, configure, and use Ghost Screen — the open-source desktop privacy overlay for Linux. Commands, shortcut setup, wallpaper, colors, and more." />
+        <meta property="og:title" content="Documentation — Ghost Screen" />
+        <meta property="og:description" content="Learn how to install, configure, and use Ghost Screen. Commands, shortcut setup, wallpaper, colors, and more." />
+        <meta property="og:url" content="https://ghost-screen.app/docs" />
+        <meta name="twitter:title" content="Documentation — Ghost Screen" />
+        <meta name="twitter:description" content="Learn how to install, configure, and use Ghost Screen. Commands, shortcut setup, wallpaper, colors, and more." />
+      </Helmet>
       <Header />
 
       {/* Mobile header */}
@@ -170,7 +180,7 @@ export default function Docs() {
             </p>
 
             <div className="mb-8 rounded-lg overflow-hidden border border-border">
-              <img src="/Doc%20image.png" alt="Ghost Screen" className="w-full" />
+              <img src="/Doc%20image.png" alt="Ghost Screen terminal output showing the overlay running on Linux" className="w-full" />
             </div>
 
             <p className="text-sm font-medium">Let&apos;s get started.</p>

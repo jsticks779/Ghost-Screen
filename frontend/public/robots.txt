@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ghost-screen.app/sitemap.xml
